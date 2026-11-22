@@ -6,7 +6,7 @@
 
 | 프로젝트 | 상태 | 다음 작업 |
 | --- | --- | --- |
-| [에이전트 격리 솔루션 실측조사](projects/agent-isolation/README.md) | 준비 | 비교 후보와 실행 환경 확정 |
+| [에이전트 격리 솔루션 실측조사](projects/agent-isolation/README.md) | 진행 | Windows 네이티브 백엔드와 호스트 기준 실행의 실측 조건 확정 |
 
 ## 운영 방식
 
