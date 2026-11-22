@@ -6,7 +6,7 @@
 
 | 프로젝트 | 상태 | 다음 작업 |
 | --- | --- | --- |
-| [코덱스 하네스 개선](projects/codex-harness-improvement/README.md) | 준비 | 대상 환경과 기준 작업 확정 |
+| [코덱스 하네스 개선](projects/codex-harness-improvement/README.md) | 준비 | 실제 작업 2개를 골라 전달 방식 프롬프트 비교 |
 
 ## 운영 방식
 
