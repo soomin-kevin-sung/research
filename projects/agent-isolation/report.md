@@ -13,6 +13,8 @@
 
 [실행 경로 비교](research/README.md) · [상세 근거와 제품별 제약](research/security-boundaries.md)
 
+**승인 후에도 같은 권한으로 실행되는지는 제품마다 다릅니다.** OpenClaw Hub는 명령 승인 후에도 Windows 격리 정책을 확인합니다. Codex는 권한 확대를 승인할 수 있지만, 조사 버전의 소스상 명시적 파일 읽기 거부가 있으면 샌드박스를 유지합니다. QwenPaw에는 일반 샌드박스 차단 후 별도 인간 승인으로 격리 없이 다시 시도하는 경로가 있습니다. [에이전트 7종의 승인 정책 비교](research/approval-policies.md)
+
 ## 사례
 
 ### 작업 폴더 안의 특정 폴더만 잠근다
@@ -42,6 +44,10 @@
 ### 격리 환경을 시작할 수 없는 PC에서 명령을 실행한다
 
 **시작 거부**는 작업이 멈췄다는 뜻입니다. **비격리 실행**은 작업이 호스트 계정 권한으로 진행됐다는 뜻입니다. OpenClaw Windows Hub는 일반적인 정책·SDK·실행 오류에서는 시작을 차단하며, Windows 자체가 미지원으로 확정된 경우 승인된 비격리 실행 경로가 있습니다. OpenHuman 안정판의 Windows 로컬 셸은 TinyBox가 Windows 격리 백엔드를 선택하지 않아 호스트에서 실행됩니다. [Windows Hub 실패 처리](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/OPENCLAW_GATEWAY_NODE_EXEC_FAQ.md) · [OpenHuman의 TinyBox 경로](research/solutions/tinybox.md)
+
+### 같은 “항상 허용”을 눌러도 저장되는 범위가 다르다
+
+OpenClaw Hub V2가 새 승인에 저장하는 단위는 실행 파일과 인수입니다. Hermes는 명령 패턴을, OpenHuman의 일반 승인은 도구 이름을 기억합니다. 공유 채팅에서 누구에게 승인 권한이 있는지도 별도 설정입니다. 실측에서는 승인 주체, 이번 요청에만 적용되는지, 다음 실행에도 재사용되는지를 기록합니다. [제품별 승인 및 저장 범위](research/approval-policies.md#핵심-결론)
 
 ## 배경지식
 
