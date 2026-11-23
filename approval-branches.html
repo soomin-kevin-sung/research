@@ -1,0 +1,61 @@
+﻿<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>보호 파일 읽기 시도 · 제품별 흐름도</title>
+<style>
+body{margin:0;background:#f3f4ef;color:#18251d;font:16px/1.5 "Segoe UI","Malgun Gothic",sans-serif}
+main{width:min(1120px,calc(100% - 40px));margin:24px auto}
+h1{margin:0;font-size:32px;letter-spacing:-.05em}p{margin:0 0 14px;color:#506057}
+figure{margin:0;overflow-x:auto;background:#fbfcf8;border-block:1px solid #c8d0c8}
+svg{display:block;width:100%;min-width:780px}
+text{fill:#18251d;font:16px "Segoe UI","Malgun Gothic",sans-serif;text-anchor:middle}
+.small{font-size:13px;fill:#506057}.strong{font-weight:700}
+.node{fill:#fbfcf8;stroke:#becac0;stroke-width:1.5}.end{fill:#e1eee5;stroke:#176449}
+.arrow{fill:none;stroke:#176449;stroke-width:2;marker-end:url(#tip)}
+.branch{stroke-dasharray:6 4}
+footer{margin-top:12px}a{color:#176449}
+</style>
+<main>
+<h1>보호 파일을 읽으려 하면?</h1>
+<p>승인된 요청이 실행되는 위치와, 거부 이후 갈라지는 경로</p>
+<figure>
+<svg viewBox="0 0 1120 620" role="img" aria-labelledby="title desc">
+<title id="title">Windows 에이전트별 보호 파일 읽기 흐름</title>
+<desc id="desc">Codex와 OpenClaw Hub는 읽기 차단을 유지한다. QwenPaw는 일반 샌드박스 차단 후 별도 인간 승인이 있으면 호스트에서 재시도할 수 있다. OpenClaw Gateway는 사용자 지정 거부 규칙을 지원하지 않으며, 나머지 네 제품의 조사 경로는 호스트 계정 권한을 따른다.</desc>
+<defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#176449"/></marker></defs>
+<text x="142" y="31" class="small strong">제품·경로</text><text x="438" y="31" class="small strong">승인 후 실행 경계</text><text x="917" y="31" class="small strong">파일 접근 결과</text>
+<g>
+<path class="arrow" d="M257 90H335"/><path class="arrow" d="M540 90H760"/>
+<rect class="node" x="27" y="61" width="230" height="58" rx="6"/><text x="142" y="86" class="strong">Codex · OpenClaw Hub</text><text class="small" x="142" y="105">명시적 읽기 거부 설정</text>
+<rect class="node" x="335" y="61" width="205" height="58" rx="6"/><text x="438" y="96">MXC에서 실행</text>
+<rect class="node end" x="760" y="61" width="314" height="58" rx="6"/><text x="917" y="96" class="strong">읽기 차단 유지</text>
+</g>
+<g>
+<path class="arrow" d="M257 244H335"/><path class="arrow" d="M540 244H578"/>
+<path class="arrow" d="M650 209V176H760"/><path class="arrow branch" d="M650 279V313H760"/>
+<rect class="node" x="27" y="215" width="230" height="58" rx="6"/><text x="142" y="240" class="strong">QwenPaw</text><text class="small" x="142" y="259">일반 샌드박스 읽기 차단</text>
+<rect class="node" x="335" y="215" width="205" height="58" rx="6"/><text x="438" y="240">Restricted Token (기본)</text><text class="small" x="438" y="259">읽기 허용 목록 → AppContainer</text>
+<path class="node" d="M650 209L722 244L650 279L578 244Z"/><text x="650" y="241" class="small strong">별도 인간</text><text x="650" y="257" class="small strong">승인?</text>
+<text x="707" y="166" class="small">거부·만료</text><text x="707" y="303" class="small">승인</text>
+<rect class="node end" x="760" y="147" width="314" height="58" rx="6"/><text x="917" y="182" class="strong">읽기 차단 유지</text>
+<rect class="node end" x="760" y="284" width="314" height="58" rx="6"/><text x="917" y="309" class="strong">격리 없이 재시도 가능</text><text x="917" y="328" class="small">호스트 계정의 파일 권한 적용</text>
+</g>
+<g>
+<path class="arrow" d="M257 410H335"/><path class="arrow" d="M540 410H760"/>
+<rect class="node" x="27" y="381" width="230" height="58" rx="6"/><text x="142" y="416" class="strong">OpenClaw Gateway</text>
+<rect class="node" x="335" y="381" width="205" height="58" rx="6"/><text x="438" y="416">Gateway MXC</text>
+<rect class="node end" x="760" y="381" width="314" height="58" rx="6"/><text x="917" y="416" class="strong">사용자 지정 읽기 거부 미지원</text>
+</g>
+<g>
+<path class="arrow" d="M257 512H335"/><path class="arrow" d="M540 512H760"/>
+<rect class="node" x="27" y="479" width="230" height="66" rx="6"/><text x="142" y="506" class="strong">Claude Code · Hermes</text><text x="142" y="527" class="strong">OpenCode · OpenHuman</text>
+<rect class="node" x="335" y="483" width="205" height="58" rx="6"/><text x="438" y="518">Windows 호스트 셸</text>
+<rect class="node end" x="760" y="483" width="314" height="58" rx="6"/><text x="917" y="518" class="strong">호스트 계정의 파일 권한 적용</text>
+</g>
+<text x="560" y="570" class="small">AppContainer는 allow_read_all=false에서 선택됩니다. 비관리자 Restricted Token은 기본 경로에서 읽기 거부를 집행하지 않습니다.</text>
+<text x="560" y="594" class="small">QwenPaw에서 모델이 격리 실행만 허용한 호출은 호스트 재시도 분기를 사용하지 않습니다.</text>
+</svg>
+</figure>
+<footer>문서·소스 조사 · Windows 실측 전 · <a href="agent-approval-flow-viewer.html">전체 시나리오와 제품별 근거</a></footer>
+</main>

@@ -1,0 +1,243 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windows 에이전트 실행 경로 비교</title>
+<style>
+:root{color-scheme:light;--paper:#f3f4ef;--ink:#18251d;--secondary:#52625a;--line:#c9d2c8;--accent:#176449;--wash:#e2eee5;--surface:#fafbf7}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 "Segoe UI","Malgun Gothic",sans-serif}
+main{width:min(1180px,calc(100% - 64px));margin:auto}
+header{display:flex;justify-content:space-between;align-items:end;gap:24px;padding:42px 0 24px;border-bottom:1px solid var(--line)}
+h1,h2,p{margin:0}
+h1{font-size:clamp(27px,4vw,47px);line-height:1.16;letter-spacing:-.065em}
+.meta{color:var(--secondary);font-size:.85rem;margin-top:8px}
+.controls{padding:24px 0;display:grid;gap:10px}
+h2,label{font-size:.85rem;font-weight:700}
+.scenarios{display:flex;flex-wrap:wrap;gap:8px}
+button,select{font:inherit;color:inherit}
+button{border:1px solid var(--line);background:transparent;border-radius:5px;padding:8px 14px;min-height:44px;cursor:pointer;transition:background .16s,border-color .16s}
+button:hover{border-color:var(--accent);background:var(--wash)}
+button[aria-pressed="true"]{color:white;background:var(--accent);border-color:var(--accent)}
+button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:var(--surface);border-block:1px solid var(--line)}
+[data-panel]{min-width:0;padding:24px 30px}
+[data-panel]+[data-panel]{border-inline-start:1px solid var(--line)}
+label{display:grid;gap:6px;color:var(--secondary)}
+select{width:100%;min-height:46px;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:7px 10px;color:var(--ink);font-weight:650}
+ol{list-style:none;padding:0;margin:24px 0 0;display:grid;grid-template-rows:minmax(105px,auto) minmax(105px,auto) auto}
+li{position:relative;padding:0 0 18px 26px;margin-left:7px;border-left:1px solid var(--line);overflow-wrap:anywhere}
+li::before{content:"";position:absolute;top:6px;left:-6px;width:11px;height:11px;border:2px solid var(--accent);background:var(--surface);border-radius:50%}
+li:last-child{border-color:transparent;padding-bottom:0}
+li:last-child::before{background:var(--accent)}
+li span{display:block;color:var(--secondary);font-size:.82rem;font-weight:650;margin-bottom:4px}
+.outcome{font-size:clamp(18px,2vw,24px);font-weight:750;color:var(--accent);line-height:1.25;letter-spacing:-.035em}
+.detail{margin-top:8px}
+footer{display:flex;flex-wrap:wrap;gap:8px 18px;padding:18px 0 35px;font-size:.87rem}
+a{color:var(--accent);text-underline-offset:3px}
+@media(max-width:680px){main{width:calc(100% - 32px)}header{padding-top:25px}.comparison{grid-template-columns:1fr}[data-panel]{padding:20px 16px}[data-panel]+[data-panel]{border-inline-start:0;border-top:1px solid var(--line)}ol{grid-template-rows:auto auto auto}}
+@media(prefers-reduced-motion:reduce){button{transition:none}}
+#results-title{padding-bottom:9px}
+#product-results{border-block:1px solid var(--line);background:var(--surface)}
+.product{border-bottom:1px solid var(--line)}
+.product:last-child{border-bottom:0}
+.product h3{margin:0;padding:10px 18px 0;font-size:1rem}
+.product summary{display:grid;grid-template-columns:minmax(110px,.45fr) minmax(0,1fr) 20px;gap:14px;align-items:center;cursor:pointer;padding:8px 18px;min-height:44px;list-style:none}
+.product summary::-webkit-details-marker{display:none}
+.product summary:hover,.product details[open] summary{background:var(--wash)}
+.product summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.product summary::after{content:"＋";color:var(--accent);text-align:center}
+.product details[open] summary::after{content:"−"}
+.route{color:var(--secondary);font-size:.86rem}
+.result{font-weight:700;color:var(--accent)}
+.product ol{grid-template-rows:none;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:14px 18px 8px}
+.product li{padding-bottom:10px}
+.product .outcome{font-size:1rem}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+@media(max-width:680px){.product ol{grid-template-columns:1fr;gap:0}.product summary{grid-template-columns:minmax(0,.65fr) minmax(0,1fr) 16px;gap:8px;padding-inline:12px}.product h3{padding-inline:12px}}
+.flow-key{display:flex;flex-wrap:wrap;gap:5px 20px;padding:0 0 12px;font-size:.82rem;color:var(--secondary)}
+.product summary{grid-template-columns:minmax(90px,.3fr) minmax(0,1fr) 20px}
+.flow{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.flow-node{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:4px;padding:2px 7px;font-size:.8rem;font-weight:650}
+.flow-node.isolated{background:var(--wash);color:var(--accent);border-color:var(--accent)}
+.flow-node.blocked{border-color:#875044;color:#704034}
+.flow-node.conditional{border-style:dashed}
+.flow-arrow{color:var(--secondary);font-weight:750}
+.route-result{display:block;margin-top:3px;font-size:.81rem;color:var(--secondary)}
+@media(max-width:680px){.product summary{grid-template-columns:minmax(0,1fr) 16px}.product summary>.route{grid-column:1/-1}.flow-node{padding-inline:4px}}
+</style>
+</head>
+<body>
+<main id="agent-approval-flow">
+  <header><div><h1>승인 후 어디서 실행되나</h1><p class="meta">Windows 네이티브 에이전트 7종 · 문서·소스 조사 · Windows 실측 전</p></div></header>
+  <section class="controls" aria-labelledby="scenario-title">
+    <h2 id="scenario-title">비교할 상황</h2>
+    <div class="scenarios" role="group" aria-labelledby="scenario-title">
+      <button type="button" data-scenario="0" aria-pressed="false">명령 승인</button>
+      <button type="button" data-scenario="1" aria-pressed="true">보호 파일 읽기 시도</button>
+      <button type="button" data-scenario="2" aria-pressed="false">격리 사용 불가</button>
+    </div>
+    <select data-choice="scenario" hidden aria-label="비교할 상황"><option>명령 승인</option><option selected>보호 파일 읽기 시도</option><option>격리 사용 불가</option></select>
+  </section>
+  <section aria-labelledby="results-title">
+    <h2 id="results-title">제품별 실행 결과</h2>
+        <div class="flow-key" aria-hidden="true"><span>◇ 호출 판정</span><span>▣ Windows 격리</span><span>□ 호스트 실행</span><span>× 차단</span><span>⋯ 조건부 경로</span></div>
+    <div id="product-results"></div>
+    <p id="results-status" class="visually-hidden" role="status"></p>
+  </section>
+  <footer><a href="projects/agent-isolation/research/approval-policies.md">승인 정책 조사 근거</a><a href="projects/agent-isolation/research/security-boundaries.md">Windows 격리 범위 조사 근거</a></footer>
+</main>
+<script>
+(() => {
+  const root = document.getElementById("agent-approval-flow");
+  const products = [
+    {
+      name: "Codex · MXC",
+      approval: "정책에 따라 사용자 또는 자동 심사가 추가 권한을 판단합니다.",
+      cases: [
+        ["일반 실행에 유효 권한 프로필을 전달합니다.", "MXC에서 실행", "프로필의 파일·네트워크 제한이 적용됩니다."],
+        ["명시적 읽기 거부를 집행할 수 있는 샌드박스를 요구합니다.", "읽기 제한 유지", "승인으로 제한을 해제하지 않습니다. 해당 제한을 집행할 수 없으면 실행을 차단합니다."],
+        ["요청한 거부 기능을 집행할 수 있는지 실행 전에 확인합니다.", "필수 제한을 집행할 수 없으면 차단", "MXC 오류가 자동으로 다른 백엔드를 선택한다는 의미는 아닙니다."]
+      ]
+    },
+    {
+      name: "OpenClaw · Gateway MXC",
+      approval: "Gateway가 실행 위치와 위험 정책을 평가합니다.",
+      cases: [
+        ["Gateway 도구의 MXC 구성을 적용합니다.", "MXC에서 실행", "Gateway 기본 호스트 경로와 별도입니다."],
+        ["Gateway MXC에 사용자 지정 파일 거부 규칙이 없습니다.", "이 규칙으로는 보호 경로를 지정할 수 없음", "제품 자체의 보호 경로와 Windows Hub의 정책은 별개입니다."],
+        ["MXC 구성을 요구한 Gateway 도구 경로입니다.", "호스트 재시도 여부 미확인", "Windows Hub의 호환 실행 규칙은 이 경로에 적용되지 않습니다."]
+      ]
+    },
+    {
+      name: "OpenClaw · Windows Hub",
+      approval: "Gateway 판정과 별도로 Hub 소유자의 승인을 확인합니다. V2 저장 단위는 실행 파일과 인수입니다.",
+      cases: [
+        ["실행 직전에 정책과 MXC 적용 가능성을 다시 검사합니다.", "MXC에서 실행", "승인한 실행 파일과 인수에도 정책이 적용됩니다."],
+        ["보호 경로의 Windows 네이티브 거부를 요구하는 구성입니다.", "보호 제한 유지", "승인으로 MXC 정책을 해제하지 않습니다. 요구 정책을 집행할 수 없으면 명령을 차단합니다."],
+        ["일반 정책·SDK·실행 오류와 Windows 미지원 확정을 구분합니다.", "오류는 차단 · 미지원은 조건부 호스트 실행", "Windows 미지원이 확인되면 별도 승인된 호환 실행 경로가 있습니다."]
+      ]
+    },
+    {
+      name: "QwenPaw · Windows 샌드박스",
+      approval: "도구와 인수를 평가해 허용·거부·질문·샌드박스 실행을 결정합니다. 일부 판정에는 모델이 관여합니다.",
+      cases: [
+        ["샌드박스 실행 판정이면 Windows 백엔드에 격리 구성을 전달합니다.", "기본 Restricted Token에서 실행", "allow_read_all=false이면 AppContainer를 선택합니다. 비관리자 Restricted Token은 기본 경로에서 읽기 거부를 집행하지 않습니다."],
+        ["실제 읽기 차단이 발생한 일반 샌드박스 호출은 사용자에게 다시 물을 수 있습니다.", "별도 승인 시 격리 없이 재시도 가능", "모델이 격리 실행만 허용한 경우에는 이 재시도 분기를 사용하지 않습니다."],
+        ["조사 소스에 일반 샌드박스 판정을 허용으로 바꾸는 분기가 있습니다.", "조건부 비격리 실행 가능", "적용 조건과 실제 실행 환경은 실측 전입니다."]
+      ]
+    },
+    {
+      name: "Claude Code · 네이티브 셸",
+      approval: "도구별 deny → ask → allow를 평가합니다. 모드에 따라 사용자 또는 분류기가 판단합니다."
+    },
+    {
+      name: "Hermes Agent · local",
+      approval: "위험 명령을 사용자 또는 보조 모델이 심사합니다. 1회·세션·영구 패턴을 사용할 수 있습니다."
+    },
+    {
+      name: "OpenCode · 안정판 V1",
+      approval: "마지막 일치 규칙을 적용하고 셸 명령과 외부 경로를 검사합니다. 항상 허용은 실행 인스턴스 범위입니다."
+    },
+    {
+      name: "OpenHuman · 로컬 TinyBox",
+      approval: "일반 승인 게이트는 기본 꺼짐입니다. 활성화 시 항상 허용은 도구 이름을 기억합니다.",
+      host: "조사 안정판의 로컬 TinyBox는 AppContainer를 선택하지 않습니다."
+    }
+  ];
+  const hostCases = [
+    ["호출 전 판정을 통과한 명령을 시작합니다.", "호스트 계정으로 실행", "실행 중 파일·네트워크 접근은 호스트 계정의 Windows 권한에 따릅니다."],
+    ["호출 전 규칙이 이 요청을 거부하면 실행을 막을 수 있습니다.", "실행된 셸은 Windows 계정 권한 적용", "승인된 프로그램 내부의 파일 읽기는 Windows 계정 권한이 허용하는 범위에서 가능합니다."],
+    ["비교 중인 경로는 Windows 호스트 셸을 사용합니다.", "호스트 계정으로 실행", "이 경로에서는 격리 백엔드 초기화 단계가 없습니다."]
+  ];
+  const scenario = root.querySelector('[data-choice="scenario"]');
+  const results = root.querySelector("#product-results");
+  const status = root.querySelector("#results-status");
+  const buttons = [...root.querySelectorAll("[data-scenario]")];
+  const labels = ["호출 판정과 승인", "실행 경계 확인", "실행 결과"];
+  const productGroups = [
+    ["Codex", [0]], ["OpenClaw", [1, 2]], ["QwenPaw", [3]],
+    ["Claude Code", [4]], ["Hermes Agent", [5]], ["OpenCode", [6]], ["OpenHuman", [7]]
+  ];
+
+  function element(tag, content, className) {
+    const node = document.createElement(tag);
+    node.textContent = content;
+    if (className) node.className = className;
+    return node;
+  }
+
+  const nodes = {
+    decision: ["◇ 판정·승인", ""],
+    isolated: ["▣ Windows 격리", "isolated"],
+    host: ["□ 호스트 실행", ""],
+    blocked: ["× 실행 차단", "blocked"],
+    protected: ["× 읽기 차단", "blocked"],
+    again: ["◇ 별도 승인", "conditional"],
+    fallback: ["□ 조건부 호스트 실행", "conditional"],
+    unknown: ["? 실행 결과 미확인", "conditional"],
+    unsupported: ["— 경로 규칙 미지원", "conditional"]
+  };
+  const paths = [
+    [["isolated"], ["isolated", "protected"], ["blocked"]],
+    [["isolated"], ["isolated", "unsupported"], ["unknown"]],
+    [["isolated"], ["isolated", "protected"], ["blocked", "/", "fallback"]],
+    [["isolated"], ["isolated", "protected", "again", "fallback"], ["fallback"]]
+  ];
+  function diagram(index, selected, result) {
+    const display = element("span", "", "diagram");
+    const flow = element("span", "", "flow");
+    const steps = ["decision", ...(paths[index]?.[selected] || ["host"])];
+    steps.forEach((step, position) => {
+      if (step === "/") return;
+      if (position) {
+        const connector = element("span", steps[position - 1] === "/" ? " / " : "→", "flow-arrow");
+        connector.setAttribute("aria-hidden", "true");
+        flow.append(connector);
+      }
+      const [label, type] = nodes[step];
+      flow.append(element("span", label, "flow-node " + type));
+    });
+    display.append(flow, element("span", result, "route-result"));
+    return display;
+  }
+
+  function render() {
+    const selected = scenario.selectedIndex;
+    const expanded = new Set([...results.querySelectorAll("details[open]")].map(node => node.dataset.route));
+    buttons.forEach((button, index) => button.setAttribute("aria-pressed", String(index === selected)));
+    results.replaceChildren(...productGroups.map(([name, routes]) => {
+      const group = element("section", "", "product");
+      group.append(element("h3", name));
+      routes.forEach(index => {
+        const product = products[index];
+        const [boundary, result, note] = (product.cases || hostCases)[selected];
+        const details = document.createElement("details");
+        details.dataset.route = index;
+        details.open = expanded.has(String(index));
+        const summary = document.createElement("summary");
+        summary.append(element("span", product.name.split(" · ")[1], "route"), diagram(index, selected, result));
+        const list = document.createElement("ol");
+        [product.approval, boundary, result].forEach((text, step) => {
+          const item = document.createElement("li");
+          item.append(element("span", labels[step]), element("p", text, step === 2 ? "outcome" : ""));
+          if (step === 2) item.append(element("p", [product.host, note].filter(Boolean).join(" "), "detail"));
+          list.append(item);
+        });
+        details.append(summary, list);
+        group.append(details);
+      });
+      return group;
+    }));
+    status.textContent = scenario.options[selected].textContent + "의 7개 제품 결과";
+  }
+
+  buttons.forEach(button => button.addEventListener("click", () => {
+    scenario.selectedIndex = Number(button.dataset.scenario);
+    render();
+  }));
+  render();
+})();
+</script>
+</body></html>

@@ -24,6 +24,12 @@ MXC 구현은 Windows PSEC의 BaseContainer 경로를 사용합니다. 두 레�
 
 MXC의 관리형 프록시를 사용하려면 유효 `allow_local_binding` 정책이 필요합니다. 이 경우 호스트 루프백과 통신할 수 있으며, 프록시를 거치는 트래픽에는 도메인 규칙이 계속 적용됩니다. 포그라운드 명령이 끝나면 남은 자식도 종료되는 동작이 있으므로, 백그라운드 개발 서버는 별도 작업 조건으로 확인합니다. [MXC 호환성 및 네트워크 설명](https://learn.chatgpt.com/docs/windows/windows-sandbox)
 
+## 권한 확대 승인 후 읽기 거부 유지
+
+Codex는 확대 요청이 승인된 후 이번 명령의 권한 프로필을 계산합니다. 명시적 읽기 거부가 있으면 기존 거부를 보존하고, 이를 집행할 수 있는 샌드박스 경로가 필요합니다. 승인 전후 쓰기 범위는 유효 프로필로 확인합니다. [실행 권한 계산](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/core/src/tools/orchestrator.rs#L228-L259) · [권한 확대 분기](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/core/src/tools/sandboxing.rs#L228-L256)
+
+MXC는 BaseContainer 사용 가능 여부와 명령에 필요한 네이티브 경로 거부 기능을 각각 검사합니다. 후자의 확인에 실패하면 명령을 시작하지 않습니다. `elevated`는 저권한 계정에 적용되는 NTFS ACL로 읽기 거부를 집행합니다. 두 방식 모두 읽기 거부 글롭을 프로세스 시작 시점에 구체적인 경로로 확장합니다. 실행 중 새로 생긴 일치 파일은 다른 권한이 허용하면 읽힐 수 있습니다. [MXC 시작 검사](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/mxc-sandbox/src/native.rs#L15-L39) · [Windows 샌드박스와 글롭 적용 시점](https://learn.chatgpt.com/docs/windows/windows-sandbox)
+
 ## 실측에서 확인할 항목
 
 - 같은 Windows 빌드에서 MXC, elevated, unelevated를 각각 기록합니다. 명령 결과에 선택된 백엔드와 적용 권한 프로필을 함께 남깁니다.

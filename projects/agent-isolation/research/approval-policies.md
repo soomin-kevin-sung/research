@@ -26,7 +26,31 @@
 
 Codex에서는 `approval_policy`가 질문 시점을, `approvals_reviewer`가 질문을 받을 주체를, 권한 프로필이 파일과 네트워크 범위를 정합니다. 고정 소스에는 실행 관리자가 일반·확대 실행을 구분한 후 Windows 백엔드를 선택하고, MXC 실행기에 권한 프로필과 명령을 함께 전달하는 경로가 있습니다. 특정 실행 규칙의 허용 판정은 정책이 허용하는 경우 샌드박스 밖 실행을 뜻할 수 있습니다. 읽기 거부가 설정되어 있을 때는 그 제한을 유지하는 경로를 사용하며, 이를 집행할 수 있는 샌드박스가 없으면 거부합니다. 명령 실패가 자동으로 다른 Windows 백엔드를 고른다는 의미는 아닙니다. [Codex 설정 레퍼런스](https://learn.chatgpt.com/docs/config-file/config-reference) · [0.171.0 실행 순서](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/core/src/tools/orchestrator.rs) · [권한 확대와 거부 보존](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/core/src/tools/sandboxing.rs) · [MXC 실행 계약](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/mxc-sandbox/README.md)
 
-OpenClaw Gateway는 요청 정책과 실행 호스트 정책을 합칠 때 더 엄격한 값을 사용합니다. 노드로 전달된 명령은 Gateway의 통과 여부와 별개로 Hub에서 검사를 받습니다. Hub V2는 실행 파일의 절대 경로와 인수에 승인을 묶고, 직전에 정책을 다시 확인합니다. 승인 대기 중 정책이 변경되면 해당 승인은 무효입니다. SDK·정책·실행 오류는 차단하며, Windows 미지원이 확인된 경우의 승인된 호스트 호환 실행은 별도 경로입니다. Gateway의 권한 확대 기능도 별도 정책이며, 격리가 필수인 역할 세션에서는 Gateway 샌드박스 밖으로 나갈 수 없습니다. [Windows Hub의 실행·승인 순서](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/OPENCLAW_GATEWAY_NODE_EXEC_FAQ.md) · [Gateway 권한 확대 정책](https://github.com/openclaw/openclaw/blob/v2026.11.6/docs/tools/elevated.md)
+OpenClaw Gateway는 요청 정책과 실행 호스트 정책을 합칠 때 더 엄격한 값을 사용합니다. 노드로 전달된 명령은 Gateway의 통과 여부와 별개로 Hub에서 검사를 받습니다. Hub V2는 실행 파일의 절대 경로와 인수에 승인을 묶고, 직전에 정책을 다시 확인합니다. 승인 대기 중 정책이 변경되면 해당 승인은 무효입니다. SDK 또는 정책 검증 오류는 시작을 차단하고, 시작 후 오류는 호스트 재시도 없이 실행 실패로 처리합니다. OS 미지원이 확인되면 호스트 호환 경로를 준비합니다. MXC와 호스트 모두 시작 직전에 기존 승인을 다시 확인합니다. Gateway의 권한 확대 기능도 별도 정책이며, 격리가 필수인 역할 세션에서는 Gateway 샌드박스 밖으로 나갈 수 없습니다. [Windows Hub의 실행·승인 순서](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/OPENCLAW_GATEWAY_NODE_EXEC_FAQ.md) · [Gateway 권한 확대 정책](https://github.com/openclaw/openclaw/blob/v2026.11.6/docs/tools/elevated.md)
+
+### Windows Hub 허용 목록의 저장과 매칭
+
+Hub는 로컬 상태 디렉터리의 `exec-approvals.json`에서 현재 에이전트와 공통 `*` 허용 항목을 읽습니다. 새 **항상 허용** 규칙은 실행 파일 경로, 인수 패턴과 승인 출처를 저장합니다. **한 번 허용**은 현재 요청에만 적용됩니다. 사용자가 직접 추가한 경로 전용 규칙은 일반 실행 파일에 대해 더 넓게 적용될 수 있습니다. [저장·정책 해석 코드](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/src/OpenClaw.Shared/ExecApprovals/ExecApprovalsStore.cs)
+
+```json
+{
+  "version": 1,
+  "agents": {
+    "main": {
+      "allowlist": [
+        {
+          "pattern": "C:\\Tools\\Git\\git.exe",
+          "argPattern": "^status\u0000$",
+          "source": "allow-always",
+          "commandText": "git status"
+        }
+      ]
+    }
+  }
+}
+```
+
+예시는 핵심 필드를 보여 줍니다. `version`은 저장 파일 형식 버전이고, `commandText`는 화면 표시와 감사에 사용합니다. `argPattern`은 인수를 NUL로 구분하므로 같은 실행 파일의 `git status --short`에는 위 항목이 일치하지 않습니다. Hub가 Gateway의 정해진 `cmd.exe` 래퍼를 신뢰할 수 있고 내부 명령을 확정할 수 있으면 내부 실행 파일과 인수로 대조합니다. 확정할 수 없는 셸 요청에는 기존 규칙을 재사용하지 않으며 별도 승인이 필요할 수 있습니다. 사용자가 일반 Windows 터미널에 직접 입력한 명령은 Hub를 거치지 않습니다. [데이터 모델](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/src/OpenClaw.Shared/ExecApprovals/ExecApprovalsContracts.cs) · [인수 형식](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/src/OpenClaw.Shared/ExecApprovals/ExecArgPattern.cs) · [셸 요청 처리](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/src/OpenClaw.Shared/ExecApprovals/ExecReusableCommandBinder.cs)
 
 ### QwenPaw에서 도구 규칙이 Windows 권한으로 바뀌는 지점
 

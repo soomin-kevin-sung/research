@@ -1,0 +1,153 @@
+﻿<section id="agent-approval-flow" lang="ko" aria-labelledby="agent-flow-title">
+  <style>
+    #agent-approval-flow { display: grid; gap: var(--font-size-base, 14px); }
+    #agent-approval-flow .comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--font-size-base, 14px); }
+    #agent-approval-flow label { display: grid; gap: .35em; }
+    #agent-approval-flow ol { list-style: none; padding: 0; margin: .7em 0 0; }
+    #agent-approval-flow li { margin-inline-start: .45em; padding: 0 0 1em 1.15em; border-inline-start: 1px solid var(--border); position: relative; overflow-wrap: anywhere; }
+    #agent-approval-flow li::before { content: ""; position: absolute; inset-inline-start: -.36em; top: .25em; width: .65em; height: .65em; border-radius: 50%; background: var(--muted-foreground); }
+    #agent-approval-flow li:last-child { border-color: transparent; padding-bottom: 0; }
+    #agent-approval-flow li:last-child::before { background: var(--primary); }
+    #agent-approval-flow li p { margin-top: .25em; }
+    #agent-approval-flow .outcome { font-weight: 500; }
+    @media (max-width: 530px) { #agent-approval-flow .comparison { grid-template-columns: 1fr; } }
+  </style>
+  <h2 id="agent-flow-title">Windows에서 승인 후 명령은 어디서 실행될까?</h2>
+  <label class="form-label">같은 상황 비교
+    <select class="form-select" data-choice="scenario">
+      <option>승인 정책을 통과한 명령</option>
+      <option>명시적으로 보호된 파일 읽기 시도</option>
+      <option>Windows 격리 백엔드를 사용할 수 없음</option>
+    </select>
+  </label>
+  <div class="comparison">
+    <section data-panel aria-live="polite"><label class="form-label">제품 A<select class="form-select" data-choice="left"></select></label><ol></ol></section>
+    <section data-panel aria-live="polite"><label class="form-label">제품 B<select class="form-select" data-choice="right"></select></label><ol></ol></section>
+  </div>
+  <p class="text-small text-muted">조사 버전의 문서·소스로 정리한 실행 경로 · Windows 실측 전</p>
+</section>
+<script>
+(() => {
+  const root = document.getElementById("agent-approval-flow");
+  const products = [
+    {
+      name: "Codex · MXC",
+      approval: "정책에 따라 사용자 또는 자동 심사가 추가 권한을 판단합니다.",
+      cases: [
+        ["일반 실행에 유효 권한 프로필을 전달합니다.", "MXC에서 실행", "프로필의 파일·네트워크 제한이 적용됩니다."],
+        ["명시적 읽기 거부를 집행할 수 있는 샌드박스를 요구합니다.", "읽기 제한 유지", "승인으로 제한을 해제하지 않습니다. 해당 제한을 집행할 수 없으면 실행을 차단합니다."],
+        ["요청한 거부 기능을 집행할 수 있는지 실행 전에 확인합니다.", "필수 제한을 집행할 수 없으면 차단", "MXC 오류가 자동으로 다른 백엔드를 선택한다는 의미는 아닙니다."]
+      ]
+    },
+    {
+      name: "OpenClaw · Gateway MXC",
+      approval: "Gateway가 실행 위치와 위험 정책을 평가합니다.",
+      cases: [
+        ["Gateway 도구의 MXC 구성을 적용합니다.", "MXC에서 실행", "Gateway 기본 호스트 경로와 별도입니다."],
+        ["Gateway MXC에 사용자 지정 파일 거부 규칙이 없습니다.", "이 규칙으로는 보호 경로를 지정할 수 없음", "제품 자체의 보호 경로와 Windows Hub의 정책은 별개입니다."],
+        ["MXC 구성을 요구한 Gateway 도구 경로입니다.", "호스트 재시도 여부 미확인", "Windows Hub의 호환 실행 규칙은 이 경로에 적용되지 않습니다."]
+      ]
+    },
+    {
+      name: "OpenClaw · Windows Hub",
+      approval: "Gateway 판정과 별도로 Hub 소유자의 승인을 확인합니다. V2 저장 단위는 실행 파일과 인수입니다.",
+      cases: [
+        ["실행 직전에 정책과 MXC 적용 가능성을 다시 검사합니다.", "MXC에서 실행", "승인한 실행 파일과 인수에도 정책이 적용됩니다."],
+        ["보호 경로의 Windows 네이티브 거부를 요구하는 구성입니다.", "보호 제한 유지", "승인으로 MXC 정책을 해제하지 않습니다. 요구 정책을 집행할 수 없으면 명령을 차단합니다."],
+        ["일반 정책·SDK·실행 오류와 Windows 미지원 확정을 구분합니다.", "오류는 차단 · 미지원은 조건부 호스트 실행", "Windows 미지원이 확인되면 별도 승인된 호환 실행 경로가 있습니다."]
+      ]
+    },
+    {
+      name: "QwenPaw · Windows 샌드박스",
+      approval: "도구와 인수를 평가해 허용·거부·질문·샌드박스 실행을 결정합니다. 일부 판정에는 모델이 관여합니다.",
+      cases: [
+        ["샌드박스 실행 판정이면 Windows 백엔드에 격리 구성을 전달합니다.", "기본 Restricted Token에서 실행", "allow_read_all=false이면 AppContainer를 선택합니다. 비관리자 Restricted Token은 기본 경로에서 읽기 거부를 집행하지 않습니다."],
+        ["실제 읽기 차단이 발생한 일반 샌드박스 호출은 사용자에게 다시 물을 수 있습니다.", "별도 승인 시 격리 없이 재시도 가능", "모델이 격리 실행만 허용한 경우에는 이 재시도 분기를 사용하지 않습니다."],
+        ["조사 소스에 일반 샌드박스 판정을 허용으로 바꾸는 분기가 있습니다.", "조건부 비격리 실행 가능", "적용 조건과 실제 실행 환경은 실측 전입니다."]
+      ]
+    },
+    {
+      name: "Claude Code · 네이티브 셸",
+      approval: "도구별 deny → ask → allow를 평가합니다. 모드에 따라 사용자 또는 분류기가 판단합니다."
+    },
+    {
+      name: "Hermes Agent · local",
+      approval: "위험 명령을 사용자 또는 보조 모델이 심사합니다. 1회·세션·영구 패턴을 사용할 수 있습니다."
+    },
+    {
+      name: "OpenCode · 안정판 V1",
+      approval: "마지막 일치 규칙을 적용하고 셸 명령과 외부 경로를 검사합니다. 항상 허용은 실행 인스턴스 범위입니다."
+    },
+    {
+      name: "OpenHuman · 로컬 TinyBox",
+      approval: "일반 승인 게이트는 기본 꺼짐입니다. 활성화 시 항상 허용은 도구 이름을 기억합니다.",
+      host: "조사 안정판의 로컬 TinyBox는 AppContainer를 선택하지 않습니다."
+    }
+  ];
+  const hostCases = [
+    ["호출 전 판정을 통과한 명령을 시작합니다.", "호스트 계정으로 실행", "실행 중 파일·네트워크 접근은 호스트 계정의 Windows 권한에 따릅니다."],
+    ["호출 전 규칙이 이 요청을 거부하면 실행을 막을 수 있습니다.", "실행된 셸은 Windows 계정 권한 적용", "승인된 프로그램 내부의 파일 읽기는 Windows 계정 권한이 허용하는 범위에서 가능합니다."],
+    ["비교 중인 경로는 Windows 호스트 셸을 사용합니다.", "호스트 계정으로 실행", "이 경로에서는 격리 백엔드 초기화 단계가 없습니다."]
+  ];
+  const scenario = root.querySelector('[data-choice="scenario"]');
+  const panels = [...root.querySelectorAll("[data-panel]")];
+  const selectors = panels.map(panel => panel.querySelector("select"));
+  const defaults = [2, 3];
+  const stepLabels = ["호출 판정과 승인", "실행 경계 확인", "실행 결과"];
+  selectors.forEach((select, index) => {
+    products.forEach((product, key) => select.add(new Option(product.name, key)));
+    select.value = defaults[index];
+  });
+
+  function render() {
+    panels.forEach((panel, index) => {
+      const product = products[Number(selectors[index].value)];
+      const [boundary, result, detail] = (product.cases || hostCases)[scenario.selectedIndex];
+      const steps = [product.approval, boundary, result];
+      const list = panel.querySelector("ol");
+      list.replaceChildren(...steps.map((step, position) => {
+        const item = document.createElement("li");
+        const label = document.createElement("span");
+        label.className = "text-small text-muted";
+        label.textContent = stepLabels[position];
+        const value = document.createElement("p");
+        value.textContent = step;
+        item.append(label, value);
+        if (position === 2) {
+          value.className = "outcome";
+          const note = document.createElement("p");
+          note.textContent = product.host ? product.host + " " + detail : detail;
+          item.append(note);
+        }
+        return item;
+      }));
+    });
+  }
+
+  function restore(state) {
+    const saved = state?.modelContent;
+    if (Number.isInteger(saved?.scenario) && scenario.options[saved.scenario]) {
+      scenario.selectedIndex = saved.scenario;
+    }
+    selectors.forEach((select, index) => {
+      const chosen = saved?.products?.[index];
+      if (Number.isInteger(chosen) && select.options[chosen]) select.selectedIndex = chosen;
+    });
+    render();
+  }
+
+  function update() {
+    render();
+    window.openai?.setWidgetState?.({
+      modelContent: {
+        scenario: scenario.selectedIndex,
+        products: selectors.map(select => select.selectedIndex)
+      }
+    })?.catch(() => {});
+  }
+
+  root.addEventListener("change", update);
+  window.addEventListener("openai:set_globals", event => restore(event.detail?.globals?.widgetState));
+  restore(window.openai?.widgetState);
+})();
+</script>

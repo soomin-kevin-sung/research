@@ -25,7 +25,16 @@ Windows Gateway용 공식 `@openclaw/mxc-sandbox` 플러그인은 설치 후 `sa
 
 ## Windows Hub 노드의 명령 실행
 
-Gateway가 노드로 전달한 `system.run`은 페어링, Gateway의 노드 명령 정책, Windows 로컬 V2 승인, MXC 정책을 거칩니다. 지원 장치에서는 Windows Hub가 파일·네트워크·클립보드·UI 정책을 MXC에 넘깁니다. 미지원으로 확정된 Windows는 차단 설정에 따라 경고와 함께 직접 실행할 수 있습니다. SDK 오류, 판정 불가, 런타임 실패는 이 호환 실행으로 전환하는 조건이 아닙니다. Hub의 로컬 MCP 모드도 같은 `system.run` 경로를 사용합니다. [Windows Hub 실행 FAQ](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/OPENCLAW_GATEWAY_NODE_EXEC_FAQ.md) · [Hub 로컬 MCP 모드](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/MCP_MODE.md)
+메시지는 **폰·채팅 → Gateway → 에이전트**로 들어옵니다. 노드 실행 요청은 **에이전트 → Gateway → Windows Hub**로 전달됩니다. 노드는 Gateway에 연결해 해당 기기의 실행 기능을 제공하는 구성요소입니다. Gateway와 Hub는 같은 PC에 있을 수 있습니다. Gateway 자체에서 실행되는 명령에는 별도 실행 경로가 적용됩니다. [배치와 실행 경로](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/OPENCLAW_GATEWAY_NODE_EXEC_FAQ.md#what-deployment-combinations-are-valid)
+
+| 단계 | 검사와 결과 |
+| --- | --- |
+| Gateway 전달 | 에이전트의 `exec` 권한, `host=node` 라우팅, 노드 페어링·연결, `system.run` 지원, 파라미터와 노드 명령 정책을 확인합니다. 필요하면 Gateway 승인도 받습니다. 기본 `full/off` 경로에서는 일반적으로 Gateway 승인 질문을 생략합니다. |
+| Hub 로컬 승인 V2 | Run system tools 설정과 로컬 정책을 평가합니다. 실행 파일 절대 경로와 정규화한 인수가 허용 목록과 일치하면 기본 정책에서 진행합니다. 미일치 시 Windows 사용자에게 한 번 허용, 항상 허용, 거부 중 하나를 묻습니다. UI를 표시할 수 없으면 기본적으로 거부합니다. |
+| 실행 경로 판정과 MXC 요청 검증 | 지원 장치에서는 파일·네트워크·클립보드·UI 정책을 담은 SDK 요청을 BaseContainer에서 집행할 수 있는지 검사합니다. OS 미지원이 확인되면 호스트 호환 실행을 준비합니다. |
+| 최종 승인 재검증 및 시작 | 두 경로 모두 시작 직전에 현재 정책과 승인의 유효성을 다시 확인합니다. 정책 변경이나 재검증 실패는 시작을 차단합니다. MXC로 시작한 프로세스에는 실행 중 격리 정책이 적용됩니다. |
+
+V2는 Windows Hub의 **로컬 명령 승인 방식**을 가리킵니다. OpenClaw 2.0은 별도로 쓰이는 제품 업데이트 명칭입니다. Windows Hub의 호환 실행에서도 명령 승인 정책은 적용됩니다. Hub의 로컬 MCP 모드도 같은 `system.run` 처리 경로를 사용합니다. [승인 V1·V2와 명령 전달 순서](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/OPENCLAW_GATEWAY_NODE_EXEC_FAQ.md) · [OpenClaw 2.0 소개](https://openclaw.ai/podcast/episode-9) · [Hub 로컬 MCP 모드](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/MCP_MODE.md) · [MXC 지원 판정](../solutions/mxc.md#openclaw-windows-hub의-지원-판정)
 
 ## 실측에서 확인할 항목
 

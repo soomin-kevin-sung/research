@@ -17,6 +17,40 @@
 
 ## 사례
 
+[Windows 셸의 파일 권한과 읽기 거부 비교](research/filesystem-isolation-comparison.md)에서 MXC BaseContainer, AppContainer, Restricted Token, Codex `elevated`의 하위 경로·신규 파일·이름 변경과 AppContainer의 IPC 제약을 비교합니다.
+
+### 승인과 실행 권한을 연결하는 네 가지 방식
+
+| 방식 | 할 수 있는 것 | 적용할 때 확인할 조건 | 조사 사례 |
+| --- | --- | --- | --- |
+| 호출 전 승인 · OS 격리 없음 | 도구나 명령을 시작하기 전에 허용·거부합니다. | 시작된 프로세스와 자식 프로세스는 호스트 계정 권한을 따릅니다. | Claude Code, Hermes Agent 기본 `local`, OpenCode, OpenHuman의 Windows 로컬 셸 |
+| 승인 후 격리 정책 검증 | 승인된 실행에도 파일·네트워크 등 OS 제한을 집행합니다. | 필수 정책을 적용할 수 있는지 실행 전에 확인합니다. 미지원 OS의 호환 실행 조건도 확인합니다. | OpenClaw Windows Hub의 `system.run` |
+| 권한 확대 후 필수 제한 유지 | 예외를 승인하고도 명시적 파일 읽기 거부를 유지합니다. | 필요한 제한을 집행할 백엔드가 없으면 실행이 차단됩니다. | Codex의 명시적 읽기 거부가 있는 권한 확대 경로 |
+| 격리 차단 후 별도 승인으로 호스트 재시도 | 일부 격리 차단을 사용자의 추가 승인으로 재시도할 수 있습니다. | 재시도에는 호스트 권한이 적용됩니다. 격리 실행만 허용한 모델 판정에는 이 분기가 적용되지 않습니다. | QwenPaw의 일반 샌드박스 차단 경로 |
+
+[상세 흐름도](../../approval-patterns-detailed.html) · [제품별 승인 정책](research/approval-policies.md)
+
+QwenPaw의 관리자 Restricted Token 경로와 Codex `elevated`는 별도 저권한 Windows 계정, 제한 토큰, 파일 ACL을 사용합니다. 차단 이후의 동작은 제품의 승인 정책이 결정합니다. QwenPaw는 일반 샌드박스 실행의 결과를 격리 위반으로 분류하면 별도 인간 승인을 거쳐 호스트에서 비격리로 재시도할 수 있습니다. Codex는 별도 권한 확대 요청을 승인받더라도, 명시적 읽기 거부가 설정된 경로에서는 그 제한을 유지한 채 실행합니다. 차단만으로 확대 승인 요청이 자동으로 발생하지는 않습니다. [QwenPaw 재시도 코드](https://github.com/agentscope-ai/QwenPaw/blob/v2.3.0.post1/src/qwenpaw/governance/tool_adapter.py#L476-L603) · [Codex 권한 확대 분기](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/core/src/tools/sandboxing.rs#L242-L256)
+
+### OpenClaw Windows Hub에서 승인과 격리를 나누는 방식
+
+폰이나 채팅의 메시지는 Gateway를 통해 에이전트에 도달합니다. 에이전트가 Windows 노드 실행을 선택하면 명령 요청은 Gateway를 거쳐 Windows Hub에 전달됩니다. Gateway와 Hub는 같은 PC에도 설치할 수 있습니다. Hub의 **명령 승인 V2**는 Windows 노드의 로컬 승인 방식 세대입니다.
+
+1. **Gateway 전달 판단.** 에이전트의 `exec` 사용 권한, 대상 노드의 페어링·연결과 `system.run` 지원, Gateway의 전달 정책을 확인합니다. Gateway 승인 질문은 정책에 따라 생략될 수 있습니다.
+2. **Hub 로컬 승인.** Hub가 실행 파일 경로와 인수를 허용 목록과 비교합니다. 기본값은 미일치 시 사용자에게 질문하고, 승인 화면을 표시할 수 없으면 거부하는 것입니다.
+3. **실행 경로 판정과 MXC 요청 검증.** 지원 장치에서는 전체 격리 정책을 BaseContainer에서 집행할 수 있는지 검사합니다. OS 미지원이 확인되면 호스트 호환 실행을 준비합니다.
+4. **최종 승인 재검증과 실행.** 두 경로 모두 프로세스 시작 직전에 승인이 여전히 유효한지 확인합니다. 지원 경로의 프로세스는 MXC가 실행 중 파일·네트워크 접근을 제한합니다.
+
+BaseContainer **미지원이 확정된 경우**에는 유효한 Hub 명령 승인을 거쳐 호스트 호환 경로에서 격리 없이 실행할 수 있습니다. SDK 로딩 실패, 판정 불가, 정책 검증 실패는 시작을 차단합니다. 시작 후 오류는 실행 실패로 처리하며 호스트에서 재시도하지 않습니다. [OpenClaw 단계별 동작](research/agents/openclaw.md#windows-hub-노드의-명령-실행) · [MXC 지원 판정](research/solutions/mxc.md#openclaw-windows-hub의-지원-판정)
+
+### 권한 확대 승인 후에도 필수 제한을 유지한다
+
+Codex `0.171.0`의 해당 경로는 **① 권한 확대 요청 심사 → ② 이번 명령의 실행 권한 계산 → ③ Windows 샌드박스에서 집행**으로 나뉩니다. 명시적 읽기 거부가 있는 경우, 명령 허용 규칙에 일치했다는 사실만으로는 파일 권한이 확대되지 않습니다. 확대 요청이 승인되면 기존 읽기 거부를 유지한 실행 프로필을 계산합니다. 실제 확대 범위는 이 프로필로 판단합니다. [권한 확대와 승인 분기](research/approval-policies.md#codex와-openclaw에서-승인-후-남는-제한)
+
+이번 방식의 도입 비교 범위는 **셸과 자식 프로세스**입니다. 후보는 **MXC BaseContainer**와 **레거시 `elevated`**입니다. MXC는 지원되는 Windows에서 프로세스 정책으로 제한을 집행하고, `elevated`는 관리자 초기 설정으로 준비한 저권한 계정과 ACL·방화벽을 사용합니다. MXC를 선호하도록 설정하면 환경과 정책에 따라 처음부터 레거시를 선택할 수 있습니다. MXC 명시 지정이나 선택 후 시작 실패는 백엔드 자동 재시도를 일으키지 않습니다. [Codex Windows 백엔드](research/agents/codex.md)
+
+방식 선정 전에는 **승인으로 쓰기 범위가 어디까지 넓어지는지**, **필수 읽기 거부가 남는지**, **선택한 백엔드가 거부를 집행할 수 없을 때 명령을 시작하지 않는지**를 확인합니다. 보호 경로의 이름 변경과 실행 중 새로 생긴 패턴 일치 파일은 별도 관찰 항목입니다. [권한 확대 실측](protocol.md#codex-권한-확대와-읽기-거부-보존) · [MXC 보호 폴더 이름 변경](protocol.md#mxc-보호-폴더-이름-변경)
+
 ### 작업 폴더 안의 특정 폴더만 잠근다
 
 에이전트에 프로젝트 수정 권한은 주되 그 안의 자격 증명 폴더는 보호해야 하는 경우입니다. **읽기 전용이라면 내용은 여전히 읽을 수 있습니다.** 내용까지 보호하려면 접근 거부가 필요합니다. Windows에서는 부모 폴더 권한이 삭제·이름 변경에 관여할 수 있으므로, 내용 읽기·쓰기와 함께 이름 표시·삭제·이름 변경도 따로 확인합니다. [Windows 파일 권한](https://learn.microsoft.com/en-us/windows/win32/fileio/file-access-rights-constants) · [삭제 및 이름 변경 규칙](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-deletefilew#remarks)
@@ -25,7 +59,7 @@
 | --- | --- |
 | **Codex MXC** | 지원되는 PC에서는 더 구체적인 하위 경로 규칙을 적용합니다. PC가 요청한 거부 기능을 지원하지 않으면 실행 전에 실패합니다. 패턴으로 지정한 거부는 명령 시작 때 존재하는 일치 항목을 기준으로 하며, 하드 링크에는 파일 이름별 권한이 유지됩니다. |
 | **OpenClaw Gateway MXC** | 사용자 지정 파일 거부 규칙을 제공하지 않습니다. 쓰기 허용 범위가 제품이 보호하는 스킬 폴더와 겹치면 명령 시작을 거부합니다. Windows Hub의 노드 실행은 별도이며, 지정된 보호 경로에 Windows의 네이티브 거부를 요구합니다. |
-| **QwenPaw AppContainer·관리자 제한 토큰** | 초기 설정 때 경로가 이미 있으면 거부 ACL을 설정합니다. 경로가 없으면 건너뛰고, 소스상 호출부에서 ACL 설정 성공 여부를 확인하지 않습니다. 비관리자 제한 토큰은 기본 실행 경로에서 읽기 거부를 집행하지 않습니다. |
+| **QwenPaw AppContainer (`allow_read_all=False`)·관리자 제한 토큰 (`allow_read_all=True`, 기본값)** | 초기 설정 때 경로가 이미 있으면 거부 ACL을 설정합니다. 경로가 없으면 건너뛰고, 소스상 호출부에서 ACL 설정 성공 여부를 확인하지 않습니다. 비관리자 제한 토큰은 기본 실행 경로에서 읽기 거부를 집행하지 않습니다. |
 
 [Codex MXC 소스](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/mxc-sandbox/README.md) · [OpenClaw Gateway](https://github.com/openclaw/openclaw/blob/v2026.11.6/extensions/mxc/README.md) · [Windows Hub](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/OPENCLAW_GATEWAY_NODE_EXEC_FAQ.md) · [QwenPaw 경로별 근거](research/security-boundaries.md#상위-폴더-허용과-하위-폴더-보호)
 
@@ -43,7 +77,7 @@
 
 ### 격리 환경을 시작할 수 없는 PC에서 명령을 실행한다
 
-**시작 거부**는 작업이 멈췄다는 뜻입니다. **비격리 실행**은 작업이 호스트 계정 권한으로 진행됐다는 뜻입니다. OpenClaw Windows Hub는 일반적인 정책·SDK·실행 오류에서는 시작을 차단하며, Windows 자체가 미지원으로 확정된 경우 승인된 비격리 실행 경로가 있습니다. OpenHuman 안정판의 Windows 로컬 셸은 TinyBox가 Windows 격리 백엔드를 선택하지 않아 호스트에서 실행됩니다. [Windows Hub 실패 처리](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/OPENCLAW_GATEWAY_NODE_EXEC_FAQ.md) · [OpenHuman의 TinyBox 경로](research/solutions/tinybox.md)
+**시작 거부**는 작업이 멈췄다는 뜻입니다. **비격리 실행**은 작업이 호스트 계정 권한으로 진행됐다는 뜻입니다. OpenClaw Windows Hub는 SDK·정책 검증에 실패하면 시작을 차단합니다. 시작 후 오류는 실행 실패로 처리하며 호스트에서 재시도하지 않습니다. OS 미지원이 확정되면 유효한 Hub 승인으로 비격리 호스트에서 실행할 수 있습니다. OpenHuman 안정판의 Windows 로컬 셸은 TinyBox가 Windows 격리 백엔드를 선택하지 않아 호스트에서 실행됩니다. [Windows Hub 실패 처리](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/OPENCLAW_GATEWAY_NODE_EXEC_FAQ.md) · [OpenHuman의 TinyBox 경로](research/solutions/tinybox.md)
 
 ### 같은 “항상 허용”을 눌러도 저장되는 범위가 다르다
 

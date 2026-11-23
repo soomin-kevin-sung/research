@@ -8,12 +8,14 @@
 
 Windows 호스트에서 명령과 파일 작업을 실행할 때 적용되는 OS 수준 격리를 비교합니다. 셸·내장 파일 도구별로 실제 실행 위치와 계정을 기록합니다. WSL2, Linux 컨테이너, 외부 VM과 원격 실행은 비교 범위에서 제외합니다.
 
+[Windows 셸의 파일 권한과 읽기 거부 비교](filesystem-isolation-comparison.md)에서는 하위 경로 예외, 이름 변경, 신규 파일, AppContainer의 IPC 제약을 비교합니다.
+
 ## 에이전트별 Windows 실행 경로
 
 | 에이전트 | Windows 실행 경로 | 비교 시 확인할 조건 |
 | --- | --- | --- |
 | [Codex](agents/codex.md) | [MXC ProcessContainer](solutions/mxc.md), 레거시 [전용 계정·제한 토큰](solutions/windows-accounts-tokens.md) | 장치 호환성, 데스크톱·CLI의 유효 백엔드, 권한 프로필 |
-| [QwenPaw](agents/qwenpaw.md) | [AppContainer](solutions/appcontainer.md) 또는 [제한 토큰·ACL·WFP](solutions/windows-accounts-tokens.md) | 거버넌스 판정, 읽기 정책, 관리자 권한 |
+| [QwenPaw](agents/qwenpaw.md) | 샌드박스 실행 시 기본 [제한 토큰](solutions/windows-accounts-tokens.md), `allow_read_all=False`이면 [AppContainer](solutions/appcontainer.md) | 거버넌스 판정, 읽기 정책, 관리자 권한 |
 | [OpenClaw](agents/openclaw.md) | Gateway 도구 및 Windows Hub 노드의 [MXC](solutions/mxc.md), Store 네이티브 Gateway의 [IsolationSession](solutions/mxc-isolation-session.md), Gateway 기본 [호스트 실행](solutions/tool-approval.md) | 도구 실행 경로와 Gateway 서비스의 배치 경계, 장치 호환성 |
 | [Claude Code](agents/claude-code.md) | [도구 승인 후 호스트 셸](solutions/tool-approval.md) | Windows 네이티브 셸의 기준 동작 |
 | [Hermes Agent](agents/hermes.md) | 기본 [호스트 셸](solutions/tool-approval.md) | `local` 백엔드의 기준 동작 |

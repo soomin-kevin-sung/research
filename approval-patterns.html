@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>승인과 샌드박스를 연결하는 네 가지 방식</title>
+<style>
+:root{--paper:#f3f4ee;--ink:#192820;--muted:#506259;--line:#c6d2c7;--green:#176247;--soft:#e0eee5}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 "Segoe UI","Malgun Gothic",sans-serif}
+main{width:min(1150px,calc(100% - 44px));margin:30px auto}header{padding-bottom:19px;border-bottom:1px solid var(--line)}
+h1,h2,p{margin:0}h1{font-size:clamp(27px,4vw,44px);line-height:1.2;letter-spacing:-.055em}header p{margin-top:7px;color:var(--muted)}
+.pattern{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,2.1fr);column-gap:29px;align-items:center;padding:17px 0;border-bottom:1px solid var(--line)}
+h2{font-size:21px;letter-spacing:-.035em;line-height:1.25}.explanation{margin-top:6px;color:var(--muted);font-size:.9rem}
+figure{margin:0;min-width:0}svg{display:block;width:100%;height:auto}svg text{font:600 17px "Segoe UI","Malgun Gothic",sans-serif;fill:var(--ink);text-anchor:middle}
+svg .note{font-size:14px;font-weight:500;fill:var(--muted)}svg rect,svg polygon{fill:#fafbf7;stroke:var(--line);stroke-width:1.7}
+svg .end{fill:var(--soft);stroke:var(--green)}svg .edge{fill:none;stroke:var(--green);stroke-width:2;marker-end:url(#arrow)}
+.examples{color:var(--muted);font-size:.85rem;margin-top:4px}.examples strong{color:var(--green);margin-right:7px}
+footer{font-size:.85rem;margin-top:14px;color:var(--muted)}a{color:var(--green);text-underline-offset:3px}
+.definitions{position:absolute;width:0;height:0}
+@media(max-width:730px){main{width:calc(100% - 28px);margin:22px auto}.pattern{grid-template-columns:1fr;gap:8px}figure{overflow:auto}figure svg{min-width:510px}}
+</style>
+<main>
+<header><h1>승인과 샌드박스를 연결하는 네 가지 방식</h1><p>승인된 명령이 어디서 실행되고, 어떤 제한이 남는지 비교합니다.</p></header>
+<svg class="definitions" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#176247"/></marker></defs></svg>
+<section class="pattern">
+<div><h2>승인 후 호스트 실행</h2><p class="explanation">호출 전 명령을 걸러냅니다. 실행된 명령과 자식 프로세스는 Windows 계정 권한을 따릅니다.</p></div>
+<figure>
+<svg viewBox="0 0 700 70" role="img" aria-label="호출 승인 후 Windows 호스트 셸에서 계정 권한으로 실행">
+<path class="edge" d="M143 35H258"/><path class="edge" d="M432 35H532"/>
+<rect x="11" y="13" width="132" height="44" rx="5"/><text x="77" y="41">호출 승인</text>
+<rect x="258" y="13" width="174" height="44" rx="5"/><text x="345" y="41">Windows 호스트 셸</text>
+<rect class="end" x="532" y="13" width="157" height="44" rx="5"/><text x="610" y="41">계정 권한 적용</text>
+</svg>
+<figcaption class="examples"><strong>사용 사례</strong> Claude Code · Hermes Agent 기본 local · OpenCode · OpenHuman Windows 로컬</figcaption>
+</figure>
+</section>
+<section class="pattern">
+<div><h2>승인 후에도 격리 정책 집행</h2><p class="explanation">실행 직전에 필요한 격리 정책을 검증합니다. 정책을 적용할 수 있는 승인된 명령을 격리 안에서 실행합니다.</p></div>
+<figure>
+<svg viewBox="0 0 700 108" role="img" aria-label="승인 후 격리 정책을 검증해 충족하면 격리 실행하고 일반 정책 오류가 있으면 차단">
+<path class="edge" d="M143 54H251"/><path class="edge" d="M439 54H490V28H532"/><path class="edge" d="M490 54V82H532"/>
+<rect x="11" y="32" width="132" height="44" rx="5"/><text x="77" y="60">호출 승인</text>
+<polygon points="251,54 345,14 439,54 345,94"/><text x="345" y="60">정책 검증</text>
+<rect class="end" x="532" y="8" width="157" height="40" rx="5"/><text x="610" y="34">격리 실행</text>
+<rect x="532" y="62" width="157" height="40" rx="5"/><text x="610" y="88">일반 오류는 차단</text>
+</svg>
+<figcaption class="examples"><strong>사용 사례</strong> OpenClaw Windows Hub의 MXC 경로 · BaseContainer 미지원 확인 시 유효한 Hub 승인으로 호스트 호환 실행</figcaption>
+</figure>
+</section>
+<section class="pattern">
+<div><h2>권한 확대 승인 후 필수 제한 유지</h2><p class="explanation">추가 권한을 승인해도 필수 제한을 집행할 수 있어야 실행합니다. 집행할 수 없으면 차단합니다.</p></div>
+<figure>
+<svg viewBox="0 0 700 108" role="img" aria-label="권한 확대 승인 뒤 필수 제한을 집행할 수 있으면 제한을 유지해 실행하고 집행할 수 없으면 차단">
+<path class="edge" d="M166 54H248"/><path class="edge" d="M442 54H488V28H532"/><path class="edge" d="M488 54V82H532"/>
+<rect x="11" y="32" width="155" height="44" rx="5"/><text x="88" y="60">권한 확대 승인</text>
+<polygon points="248,54 345,12 442,54 345,96"/><text x="345" y="51">필수 제한</text><text x="345" y="70" class="note">집행 가능?</text>
+<rect class="end" x="532" y="8" width="157" height="40" rx="5"/><text x="610" y="34">제한 유지 후 실행</text>
+<rect x="532" y="62" width="157" height="40" rx="5"/><text x="610" y="88">불가 시 차단</text>
+</svg>
+<figcaption class="examples"><strong>사용 사례</strong> Codex의 명시적 파일 읽기 거부가 설정된 권한 확대 경로</figcaption>
+</figure>
+</section>
+<section class="pattern">
+<div><h2>격리 차단 후 승인받아 호스트 재시도</h2><p class="explanation">격리에서 막힌 작업을 다시 진행할 수 있습니다. 재시도에는 호스트 계정 권한이 적용됩니다.</p></div>
+<figure>
+<svg viewBox="0 0 700 108" role="img" aria-label="격리에서 차단된 뒤 별도 인간 승인을 받으면 호스트로 재시도하고 거부되거나 만료되면 차단 유지">
+<path class="edge" d="M166 54H248"/><path class="edge" d="M442 54H483V28H532"/><path class="edge" d="M483 54V82H532"/>
+<rect x="11" y="32" width="155" height="44" rx="5"/><text x="88" y="60">격리에서 차단</text>
+<polygon points="248,54 345,12 442,54 345,96"/><text x="345" y="51">별도 인간</text><text x="345" y="70" class="note">승인?</text>
+<rect class="end" x="532" y="8" width="157" height="40" rx="5"/><text x="610" y="34">호스트 재시도</text>
+<rect x="532" y="62" width="157" height="40" rx="5"/><text x="610" y="88">거부·만료 시 차단</text>
+</svg>
+<figcaption class="examples"><strong>사용 사례</strong> QwenPaw의 일반 샌드박스 차단 경로 · 모델이 격리 실행만 승인한 경우 제외</figcaption>
+</figure>
+</section>
+<footer>Windows 네이티브 실행 · 조사 버전의 문서와 소스 기준 · 실측 전 · <a href="projects/agent-isolation/research/approval-policies.md">제품별 근거</a></footer>
+</main>

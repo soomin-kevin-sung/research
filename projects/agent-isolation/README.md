@@ -26,7 +26,7 @@
 | --- | --- | --- |
 | [Codex](research/agents/codex.md) | CLI 0.171.0 | 호환 소비자 데스크톱은 MXC 우선. 레거시는 관리자 준비형 샌드박스와 제한 토큰을 사용하며 CLI 선택은 설정에 따름 |
 | [Claude Code](research/agents/claude-code.md) | 2.1.330 | 도구 승인 후 Windows 사용자 권한으로 셸 실행 |
-| [QwenPaw](research/agents/qwenpaw.md) | 2.3.0.post1 | 거버넌스 판정에 따라 Restricted Token 또는 AppContainer에서 셸 실행 |
+| [QwenPaw](research/agents/qwenpaw.md) | 2.3.0.post1 | 샌드박스 실행 판정 시 기본 Restricted Token, `allow_read_all=False`이면 AppContainer |
 | [OpenClaw](research/agents/openclaw.md) | Gateway 2026.11.6 · Hub 2026.11.3 | Gateway 도구 MXC는 선택형. Windows 노드에 별도 MXC 경로가 있으며, 호환 PC의 Store Gateway는 IsolationSession에 배치 |
 | [Hermes Agent](research/agents/hermes.md) | 0.23.3 | 기본 로컬 Git Bash 셸은 Windows 사용자 권한으로 실행 |
 | [OpenCode](research/agents/opencode.md) | 1.19.6 | 호스트 셸과 도구 승인. V1과 V2는 승인 규칙과 기본값이 다름 |
