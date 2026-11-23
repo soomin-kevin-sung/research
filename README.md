@@ -4,7 +4,9 @@
 
 ## 프로젝트 목록
 
-아직 등록된 프로젝트가 없습니다.
+| 프로젝트 | 상태 | 다음 작업 |
+| --- | --- | --- |
+| [agent-desktop QA](projects/agent-desktop-qa/README.md) | 완료 | [완료 보고서](projects/agent-desktop-qa/completion-report.html) |
 
 ## 운영 방식
 
