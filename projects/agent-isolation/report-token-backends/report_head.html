@@ -1,0 +1,293 @@
+<title>Restricted Token 실측 보고서</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: case book. Sticky case list on the left (PC), main column with: answer, four configs, the two-step check, then one card per case (scene + four lanes), then the summary grid. */
+:root {
+  --bg: #f3f6f7;
+  --surface: #ffffff;
+  --surface-2: #e8eef0;
+  --fg: #14212a;
+  --muted: #56666f;
+  --line: #c5d0d5;
+  --qwen: #0d7a71;
+  --codex: #4a3fc4;
+  --codex-soft: #e3e1fb;
+  --ok: #1d7f4e;
+  --ok-soft: #dcf1e5;
+  --part: #a85b06;
+  --part-soft: #fbedd6;
+  --bad: #b42318;
+  --bad-soft: #fbe2df;
+  --font-body: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1519; --surface: #152027; --surface-2: #1c2a32; --fg: #e2eaee; --muted: #97a8b1; --line: #2e3d45;
+    --qwen: #3fd3c3; --codex: #aaa3ff; --codex-soft: #26234d;
+    --ok: #57d68f; --ok-soft: #133826; --part: #f3b955; --part-soft: #3f2e12; --bad: #ff8a7d; --bad-soft: #43201c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1519; --surface: #152027; --surface-2: #1c2a32; --fg: #e2eaee; --muted: #97a8b1; --line: #2e3d45;
+  --qwen: #3fd3c3; --codex: #aaa3ff; --codex-soft: #26234d;
+  --ok: #57d68f; --ok-soft: #133826; --part: #f3b955; --part-soft: #3f2e12; --bad: #ff8a7d; --bad-soft: #43201c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15.5px; line-height: 1.7; }
+.page { max-width: 1320px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 36px 96px; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 36px; }
+h1, h2, h3 { line-height: 1.3; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(28px, 3.6vw, 40px); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 24px; font-weight: 700; }
+h3 { font-size: 18px; font-weight: 700; }
+p { margin: 0; }
+ul, ol { margin: 0; }
+code { font-family: var(--font-mono); font-size: 0.86em; }
+a { color: var(--codex); }
+a:focus-visible { outline: 2px solid var(--codex); outline-offset: 2px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.q { color: var(--qwen); }
+.c { color: var(--codex); }
+
+/* nav */
+aside.nav { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; max-height: calc(100vh - 32px); overflow-y: auto; font-size: 13.5px; padding-right: 6px; }
+aside.nav > b { display: block; font-size: 13px; color: var(--muted); font-family: var(--font-mono); letter-spacing: 0.06em; margin-bottom: 8px; }
+aside.nav ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+aside.nav li.g > a { font-weight: 700; color: var(--fg); text-decoration: none; }
+aside.nav ol { list-style: none; padding: 4px 0 0 0; display: flex; flex-direction: column; gap: 2px; }
+aside.nav ol a { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px; color: var(--muted); text-decoration: none; line-height: 1.45; padding: 3px 4px; border-radius: 6px; }
+aside.nav ol a:hover { background: var(--surface); color: var(--fg); }
+aside.nav ol a span { font-family: var(--font-mono); font-size: 12px; }
+main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+
+/* intro */
+.answer { background: var(--fg); color: var(--bg); border-radius: 14px; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; }
+.answer .big { font-size: clamp(20px, 2.3vw, 27px); font-weight: 700; line-height: 1.4; }
+.answer p:last-child { opacity: 0.9; max-width: 82ch; }
+.cfgs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.cfg { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cfg.q { border-top-color: var(--qwen); }
+.cfg.c { border-top-color: var(--codex); }
+.cfg > b { font-size: 15px; }
+.cfg dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; font-size: 13px; }
+.cfg dt { color: var(--muted); }
+.cfg dd { margin: 0; }
+figure.fig { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.fig-scroll { overflow-x: auto; }
+.fig-scroll svg { display: block; width: 100%; height: auto; min-width: 720px; }
+figcaption { color: var(--muted); font-size: 14px; margin-top: 10px; max-width: 82ch; }
+.dg text { fill: var(--fg); font-family: var(--font-body); font-size: 14px; }
+.dg .t-b { font-weight: 700; }
+.dg .t-s { font-size: 12.5px; }
+.dg .t-l { font-size: 17px; }
+.dg .t-m { fill: var(--muted); }
+.dg .t-ok { fill: var(--ok); }
+.dg .t-bad { fill: var(--bad); }
+.dg .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.4; }
+.dg .box-ok { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.6; }
+.dg .box-bad { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 1.6; }
+.dg .box-c { fill: var(--codex-soft); stroke: var(--codex); stroke-width: 1.4; }
+.dg .ghost { fill: none; stroke: var(--line); stroke-width: 1.4; stroke-dasharray: 6 5; }
+.dg .ln { stroke: var(--fg); stroke-width: 1.6; fill: none; }
+.dg .ln-dash { stroke-dasharray: 6 5; }
+.m-fg { fill: var(--fg); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 13.5px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+.legend .grp { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.legend .grp > b { color: var(--fg); font-size: 13px; }
+
+/* result pills and step tags */
+.res { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14.5px; border-radius: 8px; padding: 5px 10px; border: 1.5px solid; }
+.res-n { color: var(--ok); background: var(--ok-soft); border-color: var(--ok); }
+.res-y { color: var(--bad); background: var(--bad-soft); border-color: var(--bad); }
+.res-p { color: var(--part); background: var(--part-soft); border-color: var(--part); }
+.res-x { color: var(--muted); background: var(--surface-2); border-color: var(--line); }
+.tag { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 4px; padding: 0 6px; border: 1px solid; line-height: 1.6; }
+.st-pass .tag, .tag.st-pass { color: var(--part); background: var(--part-soft); border-color: var(--part); }
+.st-fail .tag, .tag.st-fail { color: var(--ok); background: var(--ok-soft); border-color: var(--ok); }
+.st-skip .tag, .tag.st-skip { color: var(--muted); background: var(--surface-2); border-color: var(--line); }
+.st-info .tag, .tag.st-info { color: var(--fg); background: var(--surface-2); border-color: var(--line); }
+
+/* case card */
+section.group { display: flex; flex-direction: column; gap: 16px; padding-top: 28px; }
+section.group > h2 { border-bottom: 2px solid var(--fg); padding-bottom: 8px; }
+.case { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 16px; }
+.case-h { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.case-h .num { font-family: var(--font-mono); font-size: 12.5px; color: var(--bg); background: var(--fg); border-radius: 6px; padding: 1px 8px; flex: none; }
+.ico { width: 26px; height: 26px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.scene { display: grid; grid-template-columns: 170px minmax(120px, 1fr) minmax(0, 1.5fr); gap: 0 12px; align-items: center; background: var(--surface-2); border-radius: 12px; padding: 14px; }
+.actor { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.actor b { font-size: 14.5px; }
+.actor span { font-size: 12.5px; color: var(--muted); }
+.act { display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: center; }
+.act span { font-size: 13px; font-weight: 500; }
+.act i { display: block; height: 2px; background: var(--fg); position: relative; }
+.act i::after { content: ""; position: absolute; right: -2px; top: -5px; border-left: 9px solid var(--fg); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.target { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.t-head { display: flex; gap: 10px; align-items: center; }
+.t-head b { display: block; font-size: 14.5px; word-break: break-all; }
+.t-head span { display: block; font-size: 12.5px; color: var(--muted); }
+table.acl { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.acl td { padding: 3px 6px; border-top: 1px solid var(--line); vertical-align: top; }
+table.acl td:first-child { font-weight: 500; white-space: nowrap; width: 1%; }
+.acl-h { font-family: var(--font-mono); font-size: 11px; color: var(--muted); padding: 0 6px; }
+.lanes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.lane { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.lane-h { font-size: 13.5px; font-weight: 700; }
+.lane-h.q { color: var(--qwen); }
+.lane-h.c { color: var(--codex); }
+.chain { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.chain li { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 2px 6px; font-size: 13px; line-height: 1.45; }
+.chain li b { font-size: 12.5px; }
+.chain li > span:last-child { grid-column: 1 / -1; color: var(--fg); }
+.why { font-size: 14.5px; max-width: 96ch; }
+.why > b { font-family: var(--font-mono); font-size: 12px; background: var(--surface-2); border-radius: 4px; padding: 1px 6px; margin-right: 6px; }
+.why .ev { display: inline-block; font-size: 12.5px; color: var(--muted); margin-left: 6px; }
+
+/* summary */
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.tbl-wrap table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: 14px; }
+.tbl-wrap th, .tbl-wrap td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.tbl-wrap thead th { background: var(--surface-2); font-size: 13px; }
+.tbl-wrap thead th.q { color: var(--qwen); }
+.tbl-wrap thead th.c { color: var(--codex); }
+.tbl-wrap tbody th { font-weight: 500; }
+.tbl-wrap tbody th a { color: var(--fg); text-decoration: none; }
+.tbl-wrap tbody th a:hover { text-decoration: underline; }
+.tbl-wrap tr:last-child th, .tbl-wrap tr:last-child td { border-bottom: 0; }
+.dot { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13.5px; background: none !important; border: 0 !important; padding: 0 !important; }
+.dot::before { content: ""; width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.dot.res-n::before { background: var(--ok); } .dot.res-y::before { background: var(--bad); } .dot.res-p::before { background: var(--part); } .dot.res-x::before { background: var(--line); }
+.cards2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; font-size: 14.5px; min-width: 0; }
+.card ul { padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+footer { color: var(--muted); font-size: 13px; display: flex; flex-direction: column; gap: 4px; padding-top: 24px; }
+
+@media (max-width: 1060px) {
+  .page { grid-template-columns: minmax(0, 1fr); }
+  aside.nav { position: static; max-height: none; }
+  .lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cfgs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .scene { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .lanes, .cfgs, .cards2 { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+
+<div class="page">
+<aside class="nav" aria-label="사례 목록">
+  <b>사례 목록</b>
+  <ul>
+    <li class="g"><a href="#intro">읽기 전에</a></li>
+    {{NAV}}
+    <li class="g"><a href="#summary">사례 한눈에</a></li>
+    <li class="g"><a href="#conclusion">결론</a></li>
+  </ul>
+</aside>
+
+<main>
+<header id="intro" style="display:flex;flex-direction:column;gap:16px">
+  <div class="eyebrow">QwenPaw · Codex 실측 · 2026-11-25 · Windows 11 Pro 25H2</div>
+  <h1>Restricted Token 샌드박스, 사례로 보는 막힘과 뚫림</h1>
+  <div class="answer">
+    <p class="big">쓰기는 막히고, 읽기는 토큰의 계정만큼 뚫립니다.</p>
+    <p>에이전트가 실행하는 명령이 실제로 할 법한 일 19가지를 네 구성에서 5회씩 시험했습니다. 사례마다 네 구성이 <b>어느 검사에서 막혔는지, 또는 왜 통과했는지</b>를 보여 줍니다.</p>
+  </div>
+
+  <div class="cfgs" role="list">
+    <div class="cfg q" role="listitem"><b>QwenPaw 비관리자</b><dl><dt>토큰 계정</dt><dd>나(현재 사용자)</dd><dt>로그온 SID</dt><dd>나와 같음</dd><dt>제한 SID</dt><dd>capability SID, 로그온 SID, Everyone</dd><dt>필요 권한</dt><dd>일반 사용자</dd></dl></div>
+    <div class="cfg c" role="listitem"><b>Codex unelevated</b><dl><dt>토큰 계정</dt><dd>나(현재 사용자)</dd><dt>로그온 SID</dt><dd>나와 같음</dd><dt>제한 SID</dt><dd>capability SID 2개, 로그온 SID, Everyone</dd><dt>필요 권한</dt><dd>일반 사용자</dd></dl></div>
+    <div class="cfg c" role="listitem"><b>Codex elevated</b><dl><dt>토큰 계정</dt><dd>고정 샌드박스 계정(모든 작업 공유)</dd><dt>로그온 SID</dt><dd>나와 같음</dd><dt>제한 SID</dt><dd>capability SID 2개, 샌드박스 계정, 로그온 SID, Everyone</dd><dt>필요 권한</dt><dd>설치 때만 관리자</dd></dl></div>
+    <div class="cfg q" role="listitem"><b>QwenPaw 관리자</b><dl><dt>토큰 계정</dt><dd>작업 폴더마다 새 계정</dd><dt>로그온 SID</dt><dd>나와 다름(새 세션)</dd><dt>제한 SID</dt><dd>capability SID, 샌드박스 계정, 자기 로그온 SID, Everyone</dd><dt>필요 권한</dt><dd>앱 전체를 관리자로</dd></dl></div>
+  </div>
+
+  <figure class="fig">
+    <div class="fig-scroll">
+      <svg class="dg" viewBox="0 0 1000 220" role="img" aria-label="Windows는 요청마다 검사 1에서 토큰의 계정·그룹 SID로 허용 목록을 확인합니다. 쓰기 계열 요청이면 검사 2에서 제한 SID 목록으로 한 번 더 확인합니다. 읽기·실행 계열 요청은 검사 2를 하지 않습니다.">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="m-fg"/></marker></defs>
+        <text x="20" y="24" class="t-b">모든 사례의 기준: Windows가 요청을 검사하는 두 단계</text>
+        <rect x="20" y="44" width="180" height="70" rx="10" class="box"/>
+        <text x="110" y="74" text-anchor="middle" class="t-b">읽기·종료 요청</text>
+        <text x="110" y="96" text-anchor="middle" class="t-s t-m">파일 읽기, 메모리 읽기</text>
+        <rect x="240" y="44" width="300" height="70" rx="10" class="box"/>
+        <text x="390" y="74" text-anchor="middle" class="t-b">검사 1: 토큰의 계정·그룹 SID</text>
+        <text x="390" y="96" text-anchor="middle" class="t-s t-m">허용 목록에서 권한을 받았나</text>
+        <rect x="580" y="44" width="160" height="70" rx="10" class="ghost"/>
+        <text x="660" y="84" text-anchor="middle" class="t-s t-m">검사 2 안 함</text>
+        <rect x="780" y="44" width="200" height="70" rx="10" class="box-bad"/>
+        <text x="880" y="74" text-anchor="middle" class="t-b t-bad">계정이 할 수 있으면</text>
+        <text x="880" y="96" text-anchor="middle" class="t-b t-bad">샌드박스도 함</text>
+        <line x1="200" y1="79" x2="236" y2="79" class="ln" marker-end="url(#ah)"/>
+        <line x1="540" y1="79" x2="776" y2="79" class="ln ln-dash" marker-end="url(#ah)"/>
+
+        <rect x="20" y="136" width="180" height="70" rx="10" class="box"/>
+        <text x="110" y="166" text-anchor="middle" class="t-b">쓰기 요청</text>
+        <text x="110" y="188" text-anchor="middle" class="t-s t-m">파일 수정, 메모리 수정</text>
+        <rect x="240" y="136" width="300" height="70" rx="10" class="box"/>
+        <text x="390" y="166" text-anchor="middle" class="t-b">검사 1: 토큰의 계정·그룹 SID</text>
+        <text x="390" y="188" text-anchor="middle" class="t-s t-m">허용 목록에서 권한을 받았나</text>
+        <rect x="580" y="136" width="160" height="70" rx="10" class="box-c"/>
+        <text x="660" y="166" text-anchor="middle" class="t-b">검사 2: 제한 SID</text>
+        <text x="660" y="188" text-anchor="middle" class="t-s t-m">목록의 SID도 허용됐나</text>
+        <rect x="780" y="136" width="200" height="70" rx="10" class="box-ok"/>
+        <text x="880" y="166" text-anchor="middle" class="t-b t-ok">둘 다 통과해야</text>
+        <text x="880" y="188" text-anchor="middle" class="t-b t-ok">허용</text>
+        <line x1="200" y1="171" x2="236" y2="171" class="ln" marker-end="url(#ah)"/>
+        <line x1="540" y1="171" x2="576" y2="171" class="ln" marker-end="url(#ah)"/>
+        <line x1="740" y1="171" x2="776" y2="171" class="ln" marker-end="url(#ah)"/>
+      </svg>
+    </div>
+    <figcaption>네 구성 모두 <code>WRITE_RESTRICTED</code> 방식의 Restricted Token입니다. 제품은 작업 폴더의 허용 목록에 capability SID(제한 SID 목록에 넣은 무작위 SID)의 쓰기 허용을 달아 두어, 작업 폴더에서만 검사 2가 통과하게 합니다.</figcaption>
+  </figure>
+
+  <div class="legend">
+    <div class="grp"><b>결과</b><span class="res res-n">막힘</span><span class="res res-y">뚫림</span><span class="res res-p">일부만</span><span class="res res-x">실행 안 함</span></div>
+    <div class="grp"><b>막히는 과정</b><span class="tag st-pass">통과</span> 다음 단계로 넘어감 <span class="tag st-fail">거부</span> 여기서 막힘 <span class="tag st-skip">안 함</span> 이 검사를 하지 않음 <span class="tag st-info">참고</span></div>
+  </div>
+</header>
+
+{{BODY}}
+
+<section class="group" id="summary">
+  <h2>사례 한눈에</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>사례</th><th class="q">QwenPaw 비관리자</th><th class="c">Codex unelevated</th><th class="c">Codex elevated</th><th class="q">QwenPaw 관리자</th></tr></thead>
+      <tbody>{{ROWS}}</tbody>
+    </table>
+  </div>
+</section>
+
+<section class="group" id="conclusion">
+  <h2>결론</h2>
+  <div class="cards2">
+    <div class="card"><b>네 구성이 모두 막은 것</b>
+      <ul><li>작업 폴더 밖, 사용자만 쓰기를 허용한 파일 수정(사례 1)</li><li>사용자 레지스트리 쓰기(사례 4)</li><li>다른 프로그램 메모리 쓰기·스레드 만들기(사례 11)</li></ul></div>
+    <div class="card"><b>네 구성이 모두 막지 못한 것</b>
+      <ul><li>Everyone 쓰기 허용 위치(사례 2)</li><li>Users·Everyone이 읽을 수 있는 파일(사례 7)</li><li>컴퓨터 범위 DPAPI 값(사례 8)</li><li>환경 변수의 비밀값(사례 15)</li><li>쓰기 허용 하위 폴더 통째 삭제(사례 18)</li></ul></div>
+    <div class="card"><b>토큰 계정에 따라 갈린 것</b>
+      <ul><li>현재 사용자 토큰 두 구성은 사용자가 읽는 파일과 사용자 프로세스를 그대로 엶(사례 5, 6, 10)</li><li>Codex elevated는 별도 계정이지만 사용자 로그온 SID를 공유해 데스크톱 프로세스가 열림(사례 10). 고정 계정이라 작업 폴더끼리 공유(사례 12, 13)</li><li>QwenPaw 관리자만 사용자 프로세스와 옆 샌드박스를 막음(사례 10, 12). 대신 앱 전체가 관리자로 실행되고, 사용자 권한 밖 경로도 열어 줌(사례 19)</li></ul></div>
+    <div class="card"><b>판단</b>
+      <ul><li>신뢰하는 에이전트의 실수로 작업 폴더 밖을 고치는 것은 네 구성 모두 막습니다.</li><li>비밀 파일과 다른 프로그램까지 보호하려면 별도 계정과 별도 로그온 세션이 필요했습니다(QwenPaw 관리자).</li><li>신뢰하지 않는 코드를 가두는 경계로는 네 구성 모두 부족합니다. 가상 머신 같은 별도 경계가 필요합니다.</li></ul></div>
+  </div>
+  <div class="card"><b>측정 방법</b>
+    <ul>
+      <li>네 구성에 같은 시험 프로그램, 사례마다 5회. 막혔다고 보기 전에 같은 대상이 원래 열리는지 먼저 확인했습니다.</li>
+      <li>다른 프로세스·토큰·키는 지정한 권한으로 열고 바로 닫기만 했습니다. 메모리 읽기·쓰기, 가장, 종료, 알려진 우회 기법은 시도하지 않았습니다.</li>
+      <li>실제 사용 PC에서 측정 전후 상태를 기록하고 원래대로 되돌렸습니다. QwenPaw 관리자는 사용자가 승인한 관리자 세션에서 측정했습니다.</li>
+      <li>네트워크 차단과 클립보드는 측정하지 않았습니다. 사례 13의 QwenPaw 관리자 프로필 분리는 직접 측정하지 않은 간접 근거입니다.</li>
+    </ul></div>
+  <footer>
+    <span>근거: 실행 기록 <a href="../runs/2026-11-25-01.md">2026-11-25-01</a>, <a href="../runs/2026-11-25-02.md">02</a>, <a href="../runs/2026-11-25-03.md">03</a>, <a href="../runs/2026-11-25-04.md">04</a>, 판단 <a href="../findings.md">findings.md</a>. 사례 옆 근거 표시(B2, C3 등)는 <a href="../plan-token-backends.md">측정 계획</a>의 항목 이름입니다.</span>
+    <span>구성별 소스 비교와 개념 설명: <a href="../research/restricted-token-backends.md">Restricted Token 계열 백엔드 비교</a></span>
+  </footer>
+</section>
+</main>
+</div>

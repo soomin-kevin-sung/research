@@ -61,7 +61,7 @@ AppContainer의 하위 폴더 보호는 07에서 원인을 확인했습니다. �
 
 ## Restricted Token 네 구성 실측 (2026-11-25)
 
-QwenPaw 비관리자, Codex `unelevated`, Codex `elevated`를 같은 항목으로 각 5회 측정했습니다. QwenPaw 관리자 구성과 관리자 권한이 필요한 항목은 사용자가 UAC를 승인한 세션에서 같은 항목으로 측정했습니다. 네트워크와 클립보드는 측정 범위에서 뺐습니다. [UAC 없는 세 구성](runs/2026-11-25-01.md) · [UAC 단계](runs/2026-11-25-02.md) · [측정 계획](plan-token-backends.md) · [소스 비교](research/restricted-token-backends.md)
+QwenPaw 비관리자, Codex `unelevated`, Codex `elevated`를 같은 항목으로 각 5회 측정했습니다. QwenPaw 관리자 구성과 관리자 권한이 필요한 항목은 사용자가 UAC를 승인한 세션에서 같은 항목으로 측정했습니다. 네트워크와 클립보드는 측정 범위에서 뺐습니다. [UAC 없는 세 구성](runs/2026-11-25-01.md) · [UAC 단계](runs/2026-11-25-02.md) · [측정 계획](plan-token-backends.md) · [소스 비교](research/restricted-token-backends.md) · [사례별 보고서](report-token-backends/index.html)
 
 ### 막은 것
 
