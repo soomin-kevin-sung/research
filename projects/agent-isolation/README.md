@@ -2,7 +2,7 @@
 
 코딩 에이전트가 명령을 실행하고 파일을 수정할 때, 작업 권한을 어디까지 제한할 수 있는지와 그 제약이 실행 비용과 운영에 어떤 영향을 주는지 비교합니다.
 
-[Windows 네이티브 에이전트 샌드박스 조사 보고서](report.md)에서 핵심 결론, 사례와 배경지식을 읽을 수 있습니다. QwenPaw의 Restricted Token과 AppContainer를 실측한 결과는 [QwenPaw 실측 보고서](report-qwenpaw-backends.md)에 있습니다. Restricted Token 계열 네 구성의 비교 실측 계획은 [실측 계획](plan-token-backends.md)에 있습니다. 네 구성의 결과는 [결과 및 판단](findings.md#restricted-token-네-구성-실측-2026-11-25)에 있습니다. 실행 기록은 두 개로 나뉩니다. UAC 없이 측정한 세 구성(QwenPaw 비관리자, Codex `unelevated`·`elevated`)은 [2026-11-25-01](runs/2026-11-25-01.md), 사용자가 UAC를 승인해 측정한 QwenPaw 관리자 구성과 관리자 권한 항목은 [2026-11-25-02](runs/2026-11-25-02.md)입니다.
+[Windows 네이티브 에이전트 샌드박스 조사 보고서](report.md)에서 핵심 결론, 사례와 배경지식을 읽을 수 있습니다. QwenPaw의 Restricted Token과 AppContainer를 실측한 결과는 [QwenPaw 실측 보고서](report-qwenpaw-backends.md)에 있습니다. Restricted Token 계열 네 구성의 비교 실측 계획은 [실측 계획](plan-token-backends.md)에 있습니다. 네 구성의 결과는 [결과 및 판단](findings.md#restricted-token-네-구성-실측-2026-11-25)에 있습니다. 실행 기록은 두 개로 나뉩니다. UAC 없이 측정한 세 구성(QwenPaw 비관리자, Codex `unelevated`·`elevated`)은 [2026-11-25-01](runs/2026-11-25-01.md), 사용자가 UAC를 승인해 측정한 QwenPaw 관리자 구성과 관리자 권한 항목은 [2026-11-25-02](runs/2026-11-25-02.md)입니다. 처음 측정에서 빠진 Codex `elevated`의 작업 폴더 사이 계정 상태 공유(R3)는 [2026-11-25-03](runs/2026-11-25-03.md)에 있습니다.
 
 ## 조사 질문
 

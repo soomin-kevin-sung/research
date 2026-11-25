@@ -6,6 +6,7 @@ Usage:
      group : core b6first b5 b8b c5 f1 g4 g p6 h r2x p7          (all configs)
              prep uac-before uac-after r2hold cleanuprec          (qwenpaw-admin, UAC-approved session)
              r2qa b10                                             (non-elevated configs)
+             r3                                                   (codex-elevated: state shared between workspaces)
   python probe-token-backends-campaign.py qwenpaw-worker <job.json>   (internal)
 
 qwenpaw-admin runs in a UAC-approved session. Its P1/P2/G5 targets come from the non-elevated
@@ -1047,6 +1048,67 @@ def g_b10(ad, ctx):
     return out
 
 
+def g_r3(ad, ctx):
+    """R3 (Codex elevated): state shared between workspaces through the fixed sandbox account.
+    ws-A writes a synthetic file in the sandbox account's profile folder, ws-B checks it, reads it and
+    deletes it, then ws-A checks that it is gone. HKCU is opened with write and read access only."""
+    import winreg
+    if ad.name != "codex-elevated":
+        raise SystemExit("r3 is defined for codex-elevated")
+    sid = SETUP["codex_accounts"]["CodexSandboxOffline"]
+    pl = rf"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{sid}"
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, pl) as k:
+        prof = Path(winreg.QueryValueEx(k, "ProfileImagePath")[0])
+    keys = [{"id": "hkcu_software_write", "root": "HKCU", "path": "Software", "access": 0x6},
+            {"id": "hkcu_software_read", "root": "HKCU", "path": "Software", "access": 0x20019}]
+    common = [{"id": "token", "kind": "token"}, {"id": "reg", "kind": "reg", "keys": keys},
+              {"id": "env", "kind": "env", "names": ["USERPROFILE", "TEMP"]}]
+
+    def tok(r):
+        t = ((r.get("result") or {}).get("token") or {})
+        return t if isinstance(t, dict) else {}
+    out = {"trials": []}
+    for t in range(1, TRIALS + 1):
+        f = prof / f"agent-isolation-r3-{t}.txt"
+        a = ad.run("ws-A", common + [{"id": "fs", "kind": "fs", "ops": [
+            {"id": "write", "op": "write", "path": str(f), "data": f"r3-from-ws-A-{t}\n"},
+            {"id": "exists", "op": "exists", "path": str(f)}]}], f"r3a-{t}")
+        try:
+            host_sees = "exists" if f.exists() else "missing"
+        except PermissionError:
+            host_sees = "denied"  # the sandbox account profile DACL does not include the user
+        b = ad.run("ws-B", common + [{"id": "fs", "kind": "fs", "ops": [
+            {"id": "exists", "op": "exists", "path": str(f)},
+            {"id": "read", "op": "read", "path": str(f)},
+            {"id": "delete", "op": "delete", "path": str(f)}]}], f"r3b-{t}")
+        c = ad.run("ws-A", [{"id": "fs", "kind": "fs", "ops": [{"id": "exists", "op": "exists", "path": str(f)}]}],
+                   f"r3c-{t}")
+        ta, tb = tok(a), tok(b)
+        row = {"exits": [a.get("exit"), b.get("exit"), c.get("exit")],
+               "ws_a": {k: (a.get("result") or {}).get(k) for k in ("fs", "reg", "env")},
+               "ws_b": {k: (b.get("result") or {}).get(k) for k in ("fs", "reg", "env")},
+               "ws_a_after": (c.get("result") or {}).get("fs"),
+               "host_sees_file": host_sees,
+               "same_user_sid": ta.get("user") == tb.get("user") and bool(ta.get("user")),
+               "user_is_sandbox_account": ta.get("user") == sid,
+               "restricted_sids_differ": ta.get("restricted_sids") != tb.get("restricted_sids"),
+               "hkcu": [ta.get("hkcu"), tb.get("hkcu")], "profile_dir_matches": ta.get("profile_dir") == str(prof),
+               "stderr": [a.get("stderr"), b.get("stderr"), c.get("stderr")]}
+        out["trials"].append(row)
+        print(f"  r3 trial {t}: exits={row['exits']} b={row['ws_b']['fs']} after={row['ws_a_after']}", flush=True)
+    # sweep: the sandbox deletes anything a failed trial left behind (the host cannot open this profile)
+    sweep = ad.run("ws-A", [{"id": "fs", "kind": "fs", "ops": [
+        {"id": f"t{t}", "op": "exists", "path": str(prof / f"agent-isolation-r3-{t}.txt")} for t in range(1, TRIALS + 1)]}],
+        "r3-sweep")
+    out["sweep_exists"] = (sweep.get("result") or {}).get("fs")
+    left = [t for t in range(1, TRIALS + 1) if (out["sweep_exists"] or {}).get(f"t{t}") == "exists"]
+    if left:
+        d = ad.run("ws-A", [{"id": "fs", "kind": "fs", "ops": [
+            {"id": f"t{t}", "op": "delete", "path": str(prof / f"agent-isolation-r3-{t}.txt")} for t in left]}], "r3-sweep-del")
+        out["sweep_deleted"] = (d.get("result") or {}).get("fs")
+    return out
+
+
 def _subkey_exists(k, name):
     import winreg
     try:
@@ -1108,7 +1170,7 @@ def g_cleanuprec(ad, ctx):
 
 GROUPS = {"core": g_core, "b6first": g_b6first, "b5": g_b5, "b8b": g_b8b, "c5": g_c5, "f1": g_f1, "g4": g_g4,
           "g": g_g, "p6": g_p6, "h": g_h, "r2x": g_r2x, "p7": g_p7, "prep": g_prep, "uac-before": g_uacstate,
-          "uac-after": g_uacstate, "r2hold": g_r2hold, "r2qa": g_r2qa, "b10": g_b10, "cleanuprec": g_cleanuprec}
+          "uac-after": g_uacstate, "r2hold": g_r2hold, "r2qa": g_r2qa, "b10": g_b10, "cleanuprec": g_cleanuprec, "r3": g_r3}
 
 
 def main():
