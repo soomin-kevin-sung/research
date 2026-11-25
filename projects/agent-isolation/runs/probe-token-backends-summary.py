@@ -77,7 +77,7 @@ def summarize(config):
         out["P4"] = p4[0] if p4 else None
         out["C3_pre_codex_group_ace"] = core["context"].get("c3_pre_codex_group_ace")
     for g in ("b6first", "b5", "b8b", "c5", "f1", "g4", "g", "p6", "h", "r2x", "p7", "b10", "r2qa", "r2hold",
-              "prep", "uac-before", "cleanuprec", "uac-after"):
+              "prep", "uac-before", "cleanuprec", "uac-after", "r3", "nest"):
         d = load(config, g)
         if d:
             out[g] = d["result"]

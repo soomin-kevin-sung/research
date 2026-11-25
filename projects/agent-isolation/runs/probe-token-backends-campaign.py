@@ -7,6 +7,7 @@ Usage:
              prep uac-before uac-after r2hold cleanuprec          (qwenpaw-admin, UAC-approved session)
              r2qa b10                                             (non-elevated configs)
              r3                                                   (codex-elevated: state shared between workspaces)
+             nest nestc                                           (nested folder settings; qwenpaw-admin in the UAC session)
   python probe-token-backends-campaign.py qwenpaw-worker <job.json>   (internal)
 
 qwenpaw-admin runs in a UAC-approved session. Its P1/P2/G5 targets come from the non-elevated
@@ -34,6 +35,8 @@ from token_backends_common import (ROOT, TARGETS, QP_PROFILE, CODEX, REAL_CODEX_
 
 SHELL = r"C:\Windows\System32\cmd.exe"
 TRIALS = int(os.environ.get("ISO_TRIALS", "5"))
+NEST_RO = TARGETS / "nest-ro"      # g_nest case B: parent read-only, children writable
+NEST_DENY = TARGETS / "nest-deny"  # g_nest case A: parent deny-read, children readable / writable
 PROFILE = Path(os.environ["USERPROFILE"])
 SETUP = None
 
@@ -137,7 +140,16 @@ class QwenPaw:
 
     def config(self, wsname, variant="plain"):
         c = {"ws": str(ws(self.name, wsname)), "timeout": 120}
-        if wsname == "ws-A" and variant != "plain":
+        if variant == "nestw":  # parent read-only, children writable (g_nest case B)
+            c["mounts"] = [{"path": str(NEST_RO), "writable": False}, {"path": str(NEST_RO / "w"), "writable": True},
+                           {"path": str(NEST_RO / "w-empty"), "writable": True}]
+        elif variant == "nestd":  # parent deny-read, children readable / writable (g_nest case A)
+            c["mounts"] = [{"path": str(NEST_DENY / "open"), "writable": False},
+                           {"path": str(NEST_DENY / "open-w"), "writable": True}]
+            c["deny_paths"] = [str(NEST_DENY)]
+        elif variant == "nestc":  # deny-read .key inside the writable workspace (g_nestc case C)
+            c["deny_paths"] = [str(ws(self.name, wsname) / ".key")]
+        elif wsname == "ws-A" and variant != "plain":
             c["mounts"] = [{"path": str(ws(self.name, "ws-A") / "ro"), "writable": False},
                            {"path": str(TARGETS / "admin-owned"), "writable": True}]
             c["deny_paths"] = [str(TARGETS / "deny-read")]
@@ -228,7 +240,10 @@ class Codex:
         q = '":root"="read", ":tmpdir"="write", ":workspace_roots"={"."="write", "ro"="read"}'
         self.profiles = {"iso": "{" + q + "}",
                          "isodeny": "{" + q + f", '{TARGETS / 'deny-read'}'=\"deny\"" + "}",
-                         "isob10": "{" + q + f", '{TARGETS / 'admin-owned'}'=\"write\"" + "}"}
+                         "isob10": "{" + q + f", '{TARGETS / 'admin-owned'}'=\"write\"" + "}",
+                         "isonestw": "{" + q + f", '{NEST_RO}'=\"read\", '{NEST_RO / 'w'}'=\"write\", '{NEST_RO / 'w-empty'}'=\"write\"" + "}",
+                         "isonestd": "{" + q + f", '{NEST_DENY}'=\"deny\", '{NEST_DENY / 'open'}'=\"read\", '{NEST_DENY / 'open-w'}'=\"write\"" + "}",
+                         "isonestc": "{" + q + f", '{ws(self.name, 'ws-A') / '.key'}'=\"deny\"" + "}"}
 
     def argv(self, wsname, spec, profile):
         return [str(CODEX), "sandbox", "-c", f'windows.sandbox="{self.level}"',
@@ -1109,6 +1124,146 @@ def g_r3(ad, ctx):
     return out
 
 
+def g_nest(ad, ctx):
+    """Nested folder settings (non-elevated configs).
+    Case B (nestw): parent NEST_RO read-only, children w and w-empty writable.
+    Case A (nestd): parent NEST_DENY deny-read, child open readable, child open-w writable.
+    Each trial: baseline run (no nested setting), case B run, case A run. Explicit ACEs on the nest folders
+    are recorded after each run. Codex elevated leaves its deny ACEs behind (REVOKE_ACCESS does not remove
+    them), so the host removes explicit deny ACEs under NEST_DENY after each run and records how many.
+    QwenPaw runs with cleanup=True, so each run builds its sandbox (for the admin backend: account, ACEs) anew."""
+    import win32security
+    qp = isinstance(ad, QwenPaw)
+    kw = {"cleanup": True} if qp else {}
+    base_v, w_v, d_v = ("plain", "nestw", "nestd") if qp else ("iso", "isonestw", "isonestd")
+    who = {SETUP["user_sid"]: "user", SETUP["codex_group_sid"]: "codex_group", "S-1-1-0": "everyone",
+           "S-1-5-18": "system", "S-1-5-32-544": "admins", "S-1-5-32-545": "users", "S-1-5-11": "auth_users"}
+    who.update({v: "codex_account" for v in SETUP["codex_accounts"].values() if v})
+    folders = [NEST_RO, NEST_RO / "w", NEST_RO / "w-empty", NEST_DENY, NEST_DENY / "open", NEST_DENY / "open-w"]
+
+    def explicit():
+        out = {}
+        for p in folders:
+            if p.exists():
+                out[p.relative_to(TARGETS).as_posix()] = [
+                    {"deny": a["type"] == 1, "flags": a["flags"], "mask": a["mask"],
+                     "who": who.get(a["sid"], "logon" if a["sid"].startswith("S-1-5-5-") else "other")}
+                    for a in dacl_aces(p) if not a["flags"] & 0x10]
+        return out
+
+    def strip_deny():
+        n = 0
+        for p in [NEST_DENY, *NEST_DENY.rglob("*")]:
+            sd = win32security.GetNamedSecurityInfo(str(p), win32security.SE_FILE_OBJECT,
+                                                    win32security.DACL_SECURITY_INFORMATION)
+            dacl = sd.GetSecurityDescriptorDacl()
+            k = 0
+            for i in reversed(range(dacl.GetAceCount())):
+                (atype, aflags), _, _ = dacl.GetAce(i)
+                if atype == 1 and not aflags & 0x10:
+                    dacl.DeleteAce(i)
+                    k += 1
+            if k:
+                win32security.SetNamedSecurityInfo(str(p), win32security.SE_FILE_OBJECT,
+                                                   win32security.DACL_SECURITY_INFORMATION, None, None, dacl, None)
+                n += k
+        return n
+
+    def ops_b(t):
+        return [{"id": "B_parent_read", "op": "read", "path": str(NEST_RO / "f.txt")},
+                {"id": "B_parent_write", "op": "write", "path": str(NEST_RO / f"new-{t}.txt")},
+                {"id": "B_child_write", "op": "write", "path": str(NEST_RO / "w" / f"new-{t}.txt")},
+                {"id": "B_child_overwrite", "op": "write", "path": str(NEST_RO / "w" / "f.txt")},
+                {"id": "B_child_rmdir", "op": "rmdir", "path": str(NEST_RO / "w-empty")}]
+
+    def ops_a(t):
+        return [{"id": "A_parent_read", "op": "read", "path": str(NEST_DENY / "f.txt")},
+                {"id": "A_parent_list", "op": "list", "path": str(NEST_DENY)},
+                {"id": "A_child_read", "op": "read", "path": str(NEST_DENY / "open" / "g.txt")},
+                {"id": "A_childw_read", "op": "read", "path": str(NEST_DENY / "open-w" / "h.txt")},
+                {"id": "A_childw_write", "op": "write", "path": str(NEST_DENY / "open-w" / f"new-{t}.txt")}]
+
+    def run(variant, ops, tag):
+        (NEST_RO / "w-empty").mkdir(exist_ok=True)
+        r = ad.run("ws-A", [{"id": "fs", "kind": "fs", "ops": ops}], tag, variant=variant, **kw)
+        row = {"exit": r.get("exit"), "fs": (r.get("result") or {}).get("fs"), "stderr": (r.get("stderr") or "")[-300:],
+               "explicit_aces": explicit()}
+        logs = r.get("worker_logs")
+        if logs:
+            row["warnings"] = [x for x in logs if x.startswith("WARNING")][-6:]
+        row["deny_aces_removed_by_host"] = strip_deny()
+        return row
+
+    out = {"variants": [base_v, w_v, d_v], "aces_before": explicit(), "trials": []}
+    for t in range(1, TRIALS + 1):
+        tr = {"baseline": run(base_v, ops_b(t) + ops_a(t), f"nest0-{t}"),
+              "case_b": run(w_v, ops_b(t), f"nestb-{t}"),
+              "case_a": run(d_v, ops_a(t), f"nesta-{t}")}
+        out["trials"].append(tr)
+        print(f"  nest trial {t}: exits={[tr[k]['exit'] for k in ('baseline', 'case_b', 'case_a')]}", flush=True)
+    # last run without nested settings so Codex elevated drops the deny path from its state file
+    out["final_baseline"] = run(base_v, ops_a(0), "nest-final")
+    return out
+
+
+def g_nestc(ad, ctx):
+    """Case C: deny-read folder .key inside the writable workspace ws-A (prepared by nest-prep with secret.txt
+    and decoy files). Each trial: baseline run, then nestc run. Ops: read a normal workspace file (control),
+    read / list / write inside .key, delete a decoy file in .key. Explicit ACEs on ws-A and .key are recorded;
+    Codex elevated deny ACEs are removed by the host after each run (see g_nest)."""
+    import win32security
+    qp = isinstance(ad, QwenPaw)
+    kw = {"cleanup": True} if qp else {}
+    base_v, c_v = ("plain", "nestc") if qp else ("iso", "isonestc")
+    a = ws(ad.name, "ws-A")
+    key = a / ".key"
+
+    def explicit():
+        return {p.name or str(p): [{"deny": x["type"] == 1, "flags": x["flags"], "mask": x["mask"]}
+                                   for x in dacl_aces(p) if not x["flags"] & 0x10] for p in (a, key)}
+
+    def strip_deny():
+        n = 0
+        for p in [key, *key.rglob("*")]:
+            sd = win32security.GetNamedSecurityInfo(str(p), win32security.SE_FILE_OBJECT,
+                                                    win32security.DACL_SECURITY_INFORMATION)
+            dacl = sd.GetSecurityDescriptorDacl()
+            k = 0
+            for i in reversed(range(dacl.GetAceCount())):
+                (atype, aflags), _, _ = dacl.GetAce(i)
+                if atype == 1 and not aflags & 0x10:
+                    dacl.DeleteAce(i)
+                    k += 1
+            if k:
+                win32security.SetNamedSecurityInfo(str(p), win32security.SE_FILE_OBJECT,
+                                                   win32security.DACL_SECURITY_INFORMATION, None, None, dacl, None)
+                n += k
+        return n
+
+    def run(variant, tag):
+        ops = [{"id": "C_control_read", "op": "read", "path": str(a / "existing.txt")},
+               {"id": "C_key_read", "op": "read", "path": str(key / "secret.txt")},
+               {"id": "C_key_list", "op": "list", "path": str(key)},
+               {"id": "C_key_write", "op": "write", "path": str(key / f"new-{tag}.txt")},
+               {"id": "C_key_delete", "op": "delete", "path": str(key / f"decoy-{tag}.txt")}]
+        r = ad.run("ws-A", [{"id": "fs", "kind": "fs", "ops": ops}], tag, variant=variant, **kw)
+        row = {"exit": r.get("exit"), "fs": (r.get("result") or {}).get("fs"), "stderr": (r.get("stderr") or "")[-300:],
+               "explicit_aces": explicit()}
+        logs = r.get("worker_logs")
+        if logs:
+            row["warnings"] = [x for x in logs if x.startswith("WARNING")][-6:]
+        row["deny_aces_removed_by_host"] = strip_deny()
+        return row
+
+    out = {"variants": [base_v, c_v], "aces_before": explicit(), "trials": []}
+    for t in range(1, TRIALS + 1):
+        tr = {"baseline": run(base_v, f"b{t}"), "case_c": run(c_v, f"c{t}")}
+        out["trials"].append(tr)
+        print(f"  nestc trial {t}: exits={[tr[k]['exit'] for k in ('baseline', 'case_c')]}", flush=True)
+    out["final_baseline"] = run(base_v, "final")
+    return out
+
+
 def _subkey_exists(k, name):
     import winreg
     try:
@@ -1170,7 +1325,7 @@ def g_cleanuprec(ad, ctx):
 
 GROUPS = {"core": g_core, "b6first": g_b6first, "b5": g_b5, "b8b": g_b8b, "c5": g_c5, "f1": g_f1, "g4": g_g4,
           "g": g_g, "p6": g_p6, "h": g_h, "r2x": g_r2x, "p7": g_p7, "prep": g_prep, "uac-before": g_uacstate,
-          "uac-after": g_uacstate, "r2hold": g_r2hold, "r2qa": g_r2qa, "b10": g_b10, "cleanuprec": g_cleanuprec, "r3": g_r3}
+          "uac-after": g_uacstate, "r2hold": g_r2hold, "r2qa": g_r2qa, "b10": g_b10, "cleanuprec": g_cleanuprec, "r3": g_r3, "nest": g_nest, "nestc": g_nestc}
 
 
 def main():
