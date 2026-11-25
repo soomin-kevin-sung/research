@@ -1,7 +1,7 @@
 """Builds index.html, the case-by-case Restricted Token report, from the case data below and report_head.html.
 
 Usage: python gen_report.py  (writes index.html next to this file)
-Sources: runs/2026-11-25-01.md to 04.md and findings.md.
+Sources: runs/2026-11-25-01.md to 04.md, runs/2026-11-26-01.md and 02.md, and findings.md.
 """
 from html import escape as e
 from pathlib import Path
@@ -18,6 +18,8 @@ ICON = {
     "reg": '<rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/>',
     "env": '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 10h5M6 14h8M15 10h3"/>',
     "screen": '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+    "mem": '<rect x="4" y="6" width="16" height="12" rx="1"/><path d="M8 6v12M12 6v12M16 6v12"/>',
+    "pipe": '<rect x="2" y="9" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><path d="M8 12h8"/>',
 }
 
 
@@ -203,6 +205,64 @@ CASES = [
               ("y", "씀", [("pass", "ACE 추가", "관리자 권한으로 추가 → 샌드박스가 씀")])],
        why="QwenPaw 관리자는 앱이 관리자 권한이라 사용자 권한 밖의 경로도 샌드박스에 열어 줍니다.",
        ev="B10 · 5/5(Codex unelevated는 1회)"),
+ ]),
+ ("이름 있는 객체와 파이프", [
+  dict(id="c20", title="호스트 프로그램의 공유 메모리를 읽고 고친다", action="열기·읽기·쓰기",
+       target=("mem", "호스트가 Local\\에 만든 section", "보안 설명자 없이 만든 공유 메모리"),
+       acl=[("SYSTEM", "모든 권한"), ("나(소유자)", "모든 권한"), ("로그온 SID", "모든 권한(Local\\ 디렉터리에서 상속)")],
+       lanes=[("y", "뚫림", [("pass", "검사 1", "나 → 모든 권한"), ("pass", "검사 2", "로그온 SID가 목록에 있음")]),
+              ("y", "뚫림", [("pass", "검사 1", "나 → 모든 권한"), ("pass", "검사 2", "로그온 SID가 목록에 있음")]),
+              ("y", "뚫림", [("pass", "검사 1", "로그온 SID 일치 → 모든 권한"), ("pass", "검사 2", "로그온 SID가 목록에 있음")]),
+              ("n", "막힘", [("fail", "이름 공간", "Local\\ 디렉터리 권한 없음 → 호출 거부")])],
+       why="Local\\ 디렉터리는 그 안에 만드는 모든 객체에 사용자 로그온 SID의 모든 권한 ACE를 물려줍니다. 이벤트·뮤텍스·세마포어도 같은 방식으로 열고 조작했습니다. Codex가 기본 DACL로 의도한 실행 간 분리는 상속 ACE가 우선해 적용되지 않습니다.",
+       ev="N1 · 5/5"),
+  dict(id="c21", title="호스트 프로그램보다 먼저 같은 이름의 객체를 만든다", action="이름 먼저 만들기",
+       target=("mem", "Local\\ 이벤트·section", "호스트가 나중에 같은 이름으로 만듦"),
+       acl=[("샌드박스가 만든 객체", "로그온 SID 모든 권한(상속)"), ("호스트의 생성 호출", "이미 있으면 그 객체를 돌려받음")],
+       lanes=[("y", "뚫림", [("pass", "샌드박스 생성", "Local\\에 만듦"), ("pass", "호스트 생성", "기존 객체와 내용을 그대로 받음")]),
+              ("y", "뚫림", [("pass", "샌드박스 생성", "Local\\에 만듦"), ("pass", "호스트 생성", "기존 객체와 내용을 그대로 받음")]),
+              ("y", "뚫림", [("pass", "샌드박스 생성", "Local\\에 만듦"), ("pass", "호스트 생성", "기존 객체와 내용을 그대로 받음")]),
+              ("n", "막힘", [("fail", "샌드박스 생성", "이름 있는 객체 호출 거부"), ("info", "호스트 생성", "새 객체")])],
+       why="같은 이름이면 같은 객체입니다. 호스트 프로그램이 이미 있는지(ERROR_ALREADY_EXISTS) 확인하지 않으면, 샌드박스가 먼저 만든 객체와 그 안의 데이터를 그대로 씁니다. Global\\ 이벤트도 같았습니다.",
+       ev="N3·N4 · 5/5"),
+  dict(id="c22", title="샌드박스가 연 파이프로 다른 프로그램의 데이터를 받는다", action="파이프 서버 열고 기다리기",
+       target=("pipe", "샌드박스가 만든 명명된 파이프", "보안 설명자 없이 만듦"),
+       acl=[("SYSTEM·Administrators", "모든 권한"), ("소유자(토큰의 계정)", "모든 권한"), ("Everyone·익명", "읽기")],
+       lanes=[("y", "호스트가 씀", [("pass", "호스트 연결", "소유자가 나 → 쓰기 허용"), ("fail", "다른 작업 폴더", "검사 2: Everyone은 읽기만")]),
+              ("y", "호스트가 씀", [("pass", "호스트 연결", "소유자가 나 → 쓰기 허용"), ("fail", "다른 작업 폴더", "검사 2: Everyone은 읽기만")]),
+              ("y", "다른 작업 폴더가 씀", [("fail", "호스트 연결", "소유자가 샌드박스 계정 → 쓰기 거부"), ("pass", "다른 작업 폴더", "같은 고정 계정 → 쓰기 허용")]),
+              ("n", "막힘", [("fail", "호스트 연결", "쓰기 거부"), ("fail", "다른 작업 폴더", "다른 계정 → 쓰기 거부")])],
+       why="보안 설명자 없이 만든 파이프는 토큰의 기본 DACL을 따르지 않고 소유자에게만 쓰기를 줍니다. 현재 사용자 토큰 두 구성에서는 호스트가 그 파이프에 쓰고 같은 이름에 서버를 더할 수도 있었습니다. 파이프 클라이언트 가장은 측정하지 않았습니다.",
+       ev="Q2·Q3 · 5/5"),
+ ]),
+ ("도구 호환성", [
+  dict(id="c23", title="Node로 자식 프로세스를 띄운다(npm run, 테스트 실행기 방식)", action="spawn·execSync·fork",
+       target=("proc", "node 자식 프로세스", "표준 입출력·IPC를 명명된 파이프로 연결"),
+       acl=[("Node가 만든 파이프", "소유자에게만 쓰기"), ("제한 SID 목록", "현재 사용자 토큰 두 구성은 사용자 SID 없음")],
+       lanes=[("y", "실패(EPERM)", [("pass", "파이프 생성", "성공"), ("fail", "검사 2", "쓰기 연결: 목록에 사용자 SID 없음")]),
+              ("y", "실패(EPERM)", [("pass", "파이프 생성", "성공"), ("fail", "검사 2", "쓰기 연결: 목록에 사용자 SID 없음")]),
+              ("n", "동작", [("pass", "파이프 생성", "성공"), ("pass", "검사 2", "소유자인 샌드박스 계정이 목록에 있음")]),
+              ("n", "동작", [("pass", "파이프 생성", "성공"), ("pass", "검사 2", "소유자인 샌드박스 계정이 목록에 있음")])],
+       why="같은 프로세스가 만든 파이프에도 쓰기 연결을 못 해서 자식 프로세스를 띄우지 못합니다. stdio inherit와 worker_threads는 네 구성 모두 동작했습니다. Python 병렬 빌드 실패(G4)도 같은 원인입니다. Node 내부 구현은 소스로 확인하지 않은 추정입니다.",
+       ev="T2~T4·Q1 · 5/5"),
+  dict(id="c24", title="Git Bash로 명령을 실행한다", action="bash 시작",
+       target=("term", "Git Bash(MSYS2)", "시작할 때 사용자별 공유 메모리를 만듦"),
+       acl=[("사용자별 공유 메모리", "이름이 계정 SID로 시작하는 section")],
+       lanes=[("y", "실패", [("fail", "공유 메모리 생성", "CreateFileMapping … Win32 error 5")]),
+              ("y", "실패", [("fail", "공유 메모리 생성", "CreateFileMapping … Win32 error 5")]),
+              ("n", "동작", [("pass", "공유 메모리 생성", "성공 → 파이프라인·백그라운드까지 동작")]),
+              ("n", "동작", [("pass", "공유 메모리 생성", "성공 → 파이프라인·백그라운드까지 동작")])],
+       why="현재 사용자 토큰 두 구성에서는 echo조차 실행되지 않았습니다. 파이프와 같은 원인(사용자 SID에만 쓰기를 준 객체)으로 추정합니다. QwenPaw 관리자는 kernel32의 이름 있는 객체 함수가 실패하지만 Git Bash는 동작했습니다.",
+       ev="T5 · 5/5"),
+  dict(id="c25", title="사용자 저장소에서 git status를 실행한다", action="git status",
+       target=("folder", "사용자 소유 Git 저장소", "저장소 소유자 = 나"),
+       acl=[("Git 소유자 검사", "현재 계정이 소유자가 아니면 safe.directory 필요"), ("Codex elevated", "작업 폴더 Git 루트를 GIT_CONFIG_*로 등록")],
+       lanes=[("n", "동작", [("pass", "소유자 검사", "나 = 소유자")]),
+              ("n", "동작", [("pass", "소유자 검사", "나 = 소유자")]),
+              ("n", "동작", [("info", "소유자 검사", "다른 계정"), ("pass", "safe.directory", "Codex가 환경 변수로 등록")]),
+              ("y", "실패", [("info", "소유자 검사", "다른 계정"), ("fail", "safe.directory", "등록 없음 → dubious ownership")])],
+       why="Git은 현재 계정이 저장소 소유자가 아니면 safe.directory에 등록된 경로에서만 동작합니다. 별도 계정 방식은 이 검사를 따로 처리해야 합니다.",
+       ev="T6 · 5/5"),
  ]),
 ]
 

@@ -194,11 +194,11 @@ footer { color: var(--muted); font-size: 13px; display: flex; flex-direction: co
 
 <main>
 <header id="intro" style="display:flex;flex-direction:column;gap:16px">
-  <div class="eyebrow">QwenPaw · Codex 실측 · 2026-11-25 · Windows 11 Pro 25H2</div>
+  <div class="eyebrow">QwenPaw · Codex 실측 · 2026-11-25~26 · Windows 11 Pro 25H2</div>
   <h1>Restricted Token 샌드박스, 사례로 보는 막힘과 뚫림</h1>
   <div class="answer">
     <p class="big">쓰기는 막히고, 읽기는 토큰의 계정만큼 뚫립니다.</p>
-    <p>에이전트가 실행하는 명령이 실제로 할 법한 일 19가지를 네 구성에서 시험했습니다. 사례마다 네 구성이 <b>어느 검사에서 막혔는지, 또는 왜 통과했는지</b>를 보여 줍니다.</p>
+    <p>에이전트가 실행하는 명령이 실제로 할 법한 일 25가지를 네 구성에서 시험했습니다. 사례마다 네 구성이 <b>어느 검사에서 막혔는지, 또는 왜 통과했는지</b>를 보여 줍니다. 사례 23~25는 막힘·뚫림 대신 개발 도구가 샌드박스 안에서 <b>동작하는지</b>를 봅니다.</p>
   </div>
 
   <div class="cfgs" role="list">
@@ -249,6 +249,7 @@ footer { color: var(--muted); font-size: 13px; display: flex; flex-direction: co
 
   <div class="legend">
     <div class="grp"><b>결과</b><span class="res res-n">막힘</span><span class="res res-y">뚫림</span><span class="res res-p">일부만</span><span class="res res-x">실행 안 함</span></div>
+    <div class="grp"><b>도구 호환성(사례 23~25)</b><span class="res res-n">동작</span><span class="res res-y">실패</span></div>
     <div class="grp"><b>막히는 과정</b><span class="tag st-pass">통과</span> 다음 단계로 넘어감 <span class="tag st-fail">거부</span> 여기서 막힘 <span class="tag st-skip">안 함</span> 이 검사를 하지 않음 <span class="tag st-info">참고</span></div>
   </div>
 </header>
@@ -273,19 +274,21 @@ footer { color: var(--muted); font-size: 13px; display: flex; flex-direction: co
     <div class="card"><b>네 구성이 모두 막지 못한 것</b>
       <ul><li>Everyone 쓰기 허용 위치(사례 2)</li><li>Users·Everyone이 읽을 수 있는 파일(사례 7)</li><li>컴퓨터 범위 DPAPI 값(사례 8)</li><li>환경 변수의 비밀값(사례 15)</li><li>쓰기 허용 하위 폴더 통째 삭제(사례 18)</li></ul></div>
     <div class="card"><b>토큰 계정에 따라 갈린 것</b>
-      <ul><li>현재 사용자 토큰 두 구성은 사용자가 읽는 파일과 사용자 프로세스를 그대로 엶(사례 5, 6, 10)</li><li>Codex elevated는 별도 계정이지만 사용자 로그온 SID를 공유해 데스크톱 프로세스가 열림(사례 10). 고정 계정이라 작업 폴더끼리 공유(사례 12, 13)</li><li>QwenPaw 관리자만 사용자 프로세스와 다른 작업 폴더의 샌드박스를 막음(사례 10, 12). 대신 앱 전체가 관리자로 실행되고, 사용자 권한 밖 경로도 열어 줌(사례 19)</li></ul></div>
+      <ul><li>현재 사용자 토큰 두 구성은 사용자가 읽는 파일과 사용자 프로세스를 그대로 엶(사례 5, 6, 10)</li><li>Codex elevated는 별도 계정이지만 사용자 로그온 SID를 공유해 데스크톱 프로세스가 열림(사례 10). 고정 계정이라 작업 폴더끼리 공유(사례 12, 13)</li><li>QwenPaw 관리자만 사용자 프로세스와 다른 작업 폴더의 샌드박스를 막음(사례 10, 12). 대신 앱 전체가 관리자로 실행되고, 사용자 권한 밖 경로도 열어 줌(사례 19)</li><li>로그온 SID를 공유하는 세 구성은 호스트 프로그램의 Local\ 이름 있는 객체를 읽고 쓰고, 같은 이름을 먼저 만들 수 있음(사례 20, 21)</li></ul></div>
+    <div class="card"><b>도구 호환성</b>
+      <ul><li>현재 사용자 토큰 두 구성에서는 Node가 파이프로 띄우는 자식 프로세스와 Git Bash가 동작하지 않음(사례 23, 24). 원인은 소유자에게만 쓰기를 주는 객체와, 사용자 SID가 없는 제한 SID 목록의 조합</li><li>별도 계정 두 구성은 두 도구 모두 동작. QwenPaw 관리자는 사용자 소유 저장소에서 git이 소유자 검사로 거부됨(사례 25)</li></ul></div>
     <div class="card"><b>판단</b>
-      <ul><li>신뢰하는 에이전트의 실수로 작업 폴더 밖을 고치는 것은 네 구성 모두 막습니다. Everyone에 쓰기를 준 위치는 예외입니다(사례 2).</li><li>비밀 파일과 다른 프로그램까지 보호하려면 별도 계정과 별도 로그온 세션이 필요했습니다(QwenPaw 관리자).</li><li>신뢰하지 않는 코드를 가두는 경계로는 네 구성 모두 부족합니다. 가상 머신 같은 별도 경계가 필요합니다.</li></ul></div>
+      <ul><li>신뢰하는 에이전트의 실수로 작업 폴더 밖을 고치는 것은 네 구성 모두 막습니다. Everyone에 쓰기를 준 위치는 예외입니다(사례 2).</li><li>비밀 파일과 다른 프로그램까지 보호하려면 별도 계정과 별도 로그온 세션이 필요했습니다(QwenPaw 관리자).</li><li>신뢰하지 않는 코드를 가두는 경계로는 네 구성 모두 부족합니다. 가상 머신 같은 별도 경계가 필요합니다.</li><li>현재 사용자 토큰 두 구성은 경계가 약할 뿐 아니라 Node·Git Bash 같은 일반 개발 도구도 제대로 동작하지 않습니다(사례 23, 24).</li></ul></div>
   </div>
   <div class="card"><b>측정 방법</b>
     <ul>
-      <li>네 구성에 같은 시험 프로그램을 쓰고 사례마다 5회 측정했습니다. 사례 19의 Codex unelevated만 1회입니다. 막혔다고 보기 전에 같은 대상이 원래 열리는지 먼저 확인했습니다.</li>
-      <li>다른 프로세스·토큰·키는 지정한 권한으로 열고 바로 닫기만 했습니다. 메모리 읽기·쓰기, 가장, 종료, 알려진 우회 기법은 시도하지 않았습니다.</li>
+      <li>네 구성에 같은 시험 프로그램을 쓰고 사례마다 5회 측정했습니다. 사례 19의 Codex unelevated만 1회입니다. 막혔다고 보기 전에 같은 대상이 원래 열리는지 먼저 확인했습니다. 사례 20~25는 2026-11-26에 같은 방식으로 측정했고, 사례 23~25는 호스트에서 같은 명령이 모두 성공하는 것을 대조군으로 확인했습니다.</li>
+      <li>다른 프로세스·토큰·키는 지정한 권한으로 열고 바로 닫기만 했습니다. 메모리 읽기·쓰기, 가장, 종료, 알려진 우회 기법은 시도하지 않았습니다. 이름 있는 객체와 파이프는 측정용 이름으로 만든 것만 조작했습니다.</li>
       <li>실제 사용 PC에서 측정 전후 상태를 기록하고 비교했습니다. 측정이 만든 계정·ACE·시험 폴더는 지웠습니다. 사용자 결정으로 두 가지는 그대로 두었습니다. Codex <code>cap_sid</code> 파일의 시험 경로 항목은 지금은 없는 폴더 경로라 권한을 주지 않습니다. 실수 실행으로 프로필 아래 폴더 2개에 생긴 <code>CodexSandboxUsers</code> 읽기 ACE는 Codex elevated가 평소 실행 때도 추가합니다. QwenPaw 관리자는 사용자가 승인한 관리자 세션에서 측정했습니다.</li>
-      <li>네트워크 차단과 클립보드는 측정하지 않았습니다. MXC BaseContainer도 측정하지 않았습니다. 사례 13의 QwenPaw 관리자 프로필 분리는 직접 측정하지 않은 간접 근거입니다.</li>
+      <li>네트워크 차단과 클립보드는 측정하지 않았습니다. MXC BaseContainer도 측정하지 않았습니다. 사례 13의 QwenPaw 관리자 프로필 분리는 직접 측정하지 않은 간접 근거입니다. 실제 npm 명령과 테스트 실행기는 실행하지 않고 Node 내장 함수로만 시험했습니다.</li>
     </ul></div>
   <footer>
-    <span>근거: 실행 기록 <a href="../runs/2026-11-25-01.md">2026-11-25-01</a>, <a href="../runs/2026-11-25-02.md">02</a>, <a href="../runs/2026-11-25-03.md">03</a>, <a href="../runs/2026-11-25-04.md">04</a>, 판단 <a href="../findings.md">findings.md</a>. 사례 옆 근거 표시(B2, C3 등)는 <a href="../plan-token-backends.md">측정 계획</a>의 항목 이름입니다.</span>
+    <span>근거: 실행 기록 <a href="../runs/2026-11-25-01.md">2026-11-25-01</a>, <a href="../runs/2026-11-25-02.md">02</a>, <a href="../runs/2026-11-25-03.md">03</a>, <a href="../runs/2026-11-25-04.md">04</a>, <a href="../runs/2026-11-26-01.md">2026-11-26-01</a>, <a href="../runs/2026-11-26-02.md">02</a>, 판단 <a href="../findings.md">findings.md</a>. 사례 옆 근거 표시(B2, C3 등)는 <a href="../plan-token-backends.md">측정 계획</a>의 항목 이름입니다.</span>
     <span>구성별 소스 비교와 개념 설명: <a href="../research/restricted-token-backends.md">Restricted Token 계열 백엔드 비교</a></span>
   </footer>
 </section>

@@ -8,7 +8,7 @@
 | --- | --- |
 | [조사 보고서](report.md) | 핵심 결론(무엇이 막히고 무엇이 뚫리는지), 문헌·소스 조사 사례, 배경지식 |
 | [결과 및 판단](findings.md) | 조사 질문별 결론과 근거, 네 구성 결과 표, 측정하지 않은 항목 |
-| [사례별 보고서](report-token-backends/index.html) | 사례 19개마다 네 구성이 어느 검사에서 막히는지 그린 HTML 보고서(`gen_report.py`로 생성) |
+| [사례별 보고서](report-token-backends/index.html) | 사례 25개마다 네 구성이 어느 검사에서 막히는지(사례 23~25는 도구가 동작하는지) 그린 HTML 보고서(`gen_report.py`로 생성) |
 | [QwenPaw 실측 보고서](report-qwenpaw-backends.md) | QwenPaw의 Restricted Token(비관리자)과 AppContainer 실측(2026-11-23~24) |
 | [Restricted Token 계열 백엔드 비교](research/restricted-token-backends.md) | 네 구성의 소스 비교와 실측 결과 표 |
 | [실측 계획](plan-token-backends.md) | 네 구성 실측 계획과 단계별 최종 상태 |

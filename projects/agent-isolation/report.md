@@ -6,7 +6,7 @@ Windows에서 직접 실행하는 에이전트 7종을 공식 문서와 릴리�
 
 **실측한 Restricted Token 네 구성은 쓰기를 막고, 읽기는 토큰의 계정이 읽을 수 있는 만큼 허용합니다.** 신뢰하는 에이전트가 실수로 작업 폴더 밖에 쓰는 일은 줄입니다. 신뢰하지 않는 코드를 가두는 보안 경계로는 네 구성 모두 부족합니다.
 
-측정한 구성은 QwenPaw `2.3.0.post1`의 비관리자·관리자와 Codex CLI `0.172.0`의 `unelevated`·`elevated`입니다. 대부분의 항목을 5회 측정했고, 횟수가 다른 항목은 결과 표에 적었습니다. [사례 19개로 보는 결과](report-token-backends/index.html) · [결과 표와 판단](findings.md#restricted-token-네-구성-실측-2026-11-25)
+측정한 구성은 QwenPaw `2.3.0.post1`의 비관리자·관리자와 Codex CLI `0.172.0`의 `unelevated`·`elevated`입니다. 대부분의 항목을 5회 측정했고, 횟수가 다른 항목은 결과 표에 적었습니다. [사례 25개로 보는 결과](report-token-backends/index.html) · [결과 표와 판단](findings.md#restricted-token-네-구성-실측-2026-11-25)
 
 ### 막힌 것
 
