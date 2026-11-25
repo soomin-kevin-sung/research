@@ -10,6 +10,8 @@ Windows 호스트에서 명령과 파일 작업을 실행할 때 적용되는 OS
 
 [Windows 셸의 파일 권한과 읽기 거부 비교](filesystem-isolation-comparison.md)에서는 하위 경로 예외, 이름 변경, 신규 파일, AppContainer의 IPC 제약을 비교합니다.
 
+[Restricted Token 계열 백엔드 비교](restricted-token-backends.md)에서는 QwenPaw의 비관리자·관리자 백엔드와 Codex `unelevated`·`elevated`의 토큰 구성, 쓰기·읽기 ACE, 네트워크, 데스크톱, 프로세스 수명, 실행 후 남는 항목을 소스 기준으로 비교합니다.
+
 ## 에이전트별 Windows 실행 경로
 
 | 에이전트 | Windows 실행 경로 | 비교 시 확인할 조건 |
