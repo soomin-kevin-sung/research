@@ -1,4 +1,4 @@
-"""Named object and pipe measurements (plan-token-backends.md N0-N4, Q1-Q3), 2026-11-26.
+"""Named object, pipe and tool measurements (plan-token-backends.md N0-N4, Q1-Q3, T1-T6), 2026-11-26.
 
 Usage:
   python probe-named-objects-campaign.py <config> <group> [<group> ...]
@@ -7,11 +7,14 @@ Usage:
              dirs                   N0 host side
              uac-before uac-after   qwenpaw-admin in the UAC-approved session: admin-only state
              qpcleanup              qwenpaw-admin: the product's cleanup, then what stays on the PC
+             tools                  T1-T6: Node, Git Bash and Git inside the sandbox, five trials
+             toolshost              T1-T6 run directly on the host (control; normal session only)
 
 The configurations, QwenPaw worker and Codex command lines are those of probe-token-backends-campaign.py
 (imported, unchanged). Every host-side action goes through probe-named-objects-hostagent.py, which must be
 running in the normal (non-elevated) session. Codex elevated groups stop if the sandbox accounts change
-(plan 2.3). Each group writes local/2026-11-26/<config>-<group>.json.
+(plan 2.3). Each group writes local/<ISO_DATE>/<config>-<group>.json. ISO_DATE defaults to 2026-11-26
+(N, Q); the tool run uses ISO_DATE=2026-11-26-tools. The host agent is needed only for nq and dirs.
 """
 import os
 import sys
@@ -23,10 +26,10 @@ import subprocess
 import importlib.util
 from pathlib import Path
 
-os.environ["ISO_DATE"] = "2026-11-26"
+os.environ.setdefault("ISO_DATE", "2026-11-26")
 sys.path.insert(0, str(Path(__file__).parent))
-from token_backends_common import (LOCAL, REAL_CODEX_HOME, ROOT, ws, load, save, wait_file,  # noqa: E402
-                                   parse_isojson, dacl_aces, lookup_sid)
+from token_backends_common import (LOCAL, REAL_CODEX_HOME, ROOT, PY, CHILD, ws, load, save, wait_file,  # noqa: E402
+                                   parse_isojson, dacl_aces, lookup_sid, write_spec)
 
 _spec = importlib.util.spec_from_file_location("campaign", Path(__file__).with_name("probe-token-backends-campaign.py"))
 K = importlib.util.module_from_spec(_spec)
@@ -139,6 +142,58 @@ def g_nq(ad, ctx):
     return out
 
 
+NODE = r"C:\Program Files\nodejs\node.exe"
+BASH = r"C:\Program Files\Git\usr\bin\bash.exe"
+BASH_LAUNCHER = r"C:\Program Files\Git\bin\bash.exe"
+GIT = r"C:\Program Files\Git\cmd\git.exe"
+NODE_CASES = ("basic", "spawn_pipe", "spawn_inherit", "spawn_async", "exec_shell", "fork_ipc", "worker", "pipe_server")
+
+
+def tool_tasks(a_ws, tag):
+    js, cwd = str(a_ws / "nodetest.js"), str(a_ws)
+    tasks = [{"id": f"node_{c}", "kind": "run", "argv": [NODE, js, c, tag], "cwd": cwd, "timeout": 40} for c in NODE_CASES]
+    b = [BASH, "--noprofile", "--norc", "-c"]
+    # /usr/bin first: without a login profile, bash only has the caller's PATH, which differs between the
+    # Git Bash session (normal session runs) and cmd (UAC batch). First tool run 2026-11-26 lacked this.
+    for name, cmd in (("bash_echo", "echo bash-ok"), ("bash_pipe", "echo pipe-ok | cat"),
+                      ("bash_subst", 'x=$(echo subst-ok); echo "$x"'), ("bash_bg", "sleep 1 & wait $!; echo bg-ok:$?")):
+        tasks.append({"id": name, "kind": "run", "argv": b + ["PATH=/usr/bin:$PATH; " + cmd], "cwd": cwd})
+    tasks += [{"id": "bash_launcher", "kind": "run", "argv": [BASH_LAUNCHER, "--noprofile", "--norc", "-c", "echo launcher-ok"],
+               "cwd": cwd},
+              {"id": "git_version", "kind": "run", "argv": [GIT, "--version"], "cwd": cwd},
+              {"id": "git_status", "kind": "run",
+               "argv": [GIT, "-C", str(a_ws / "repo"), "--no-optional-locks", "status", "--porcelain"], "cwd": cwd}]
+    return tasks
+
+
+def g_tools(ad, ctx):
+    variant = "plain" if isinstance(ad, K.QwenPaw) else "iso"
+    a_ws = ws(ad.name, "ws-A")
+    out = []
+    for t in range(1, K.TRIALS + 1):
+        tag = uuid.uuid4().hex[:8]
+        r = ad.run("ws-A", [{"id": "token", "kind": "token"}, *tool_tasks(a_ws, tag)], f"tools-{t}", variant=variant,
+                   timeout=900)
+        out.append({"trial": t, "tag": tag, **r})
+        print(f"[{ad.name}] tools trial {t} done", flush=True)
+    return out
+
+
+def g_toolshost(ad, ctx):
+    """Control: the same commands run directly on the host by the non-elevated in-sandbox program."""
+    if K.is_elevated():
+        raise SystemExit("toolshost is the non-elevated host control")
+    a_ws = ws(ad.name, "ws-A")
+    out = []
+    for t in range(1, K.TRIALS + 1):
+        tag = uuid.uuid4().hex[:8]
+        spec = write_spec(a_ws, f"toolshost-{t}", tool_tasks(a_ws, tag))
+        p = subprocess.run([str(PY), "-I", "-B", str(CHILD), str(spec)], capture_output=True, timeout=900)
+        out.append({"trial": t, "tag": tag, "exit": p.returncode,
+                    "result": parse_isojson(p.stdout.decode("utf-8", "replace"))})
+    return out
+
+
 def g_dirs(ad, ctx):
     return host("dirs")
 
@@ -180,7 +235,8 @@ def g_qpcleanup(ad, ctx):
     return out
 
 
-GROUPS = {"nq": g_nq, "dirs": g_dirs, "qpcleanup": g_qpcleanup, "uac-before": K.g_uacstate, "uac-after": K.g_uacstate}
+GROUPS = {"nq": g_nq, "dirs": g_dirs, "qpcleanup": g_qpcleanup, "uac-before": K.g_uacstate, "uac-after": K.g_uacstate,
+          "tools": g_tools, "toolshost": g_toolshost}
 
 
 def main():
@@ -189,10 +245,12 @@ def main():
     ad = K.adapter(config)
     if ad.name == "qwenpaw-admin" and not K.is_elevated():
         raise SystemExit("qwenpaw-admin needs the UAC-approved session (IsUserAnAdmin is false)")
-    ping = host("ping", timeout=15)
-    if not ping.get("ok") or ping["result"].get("elevated"):
-        raise SystemExit(f"host agent missing or elevated: {ping}")
-    ctx = {"host_agent": ping["result"]}
+    ctx = {}
+    if {"nq", "dirs"} & set(groups):
+        ping = host("ping", timeout=15)
+        if not ping.get("ok") or ping["result"].get("elevated"):
+            raise SystemExit(f"host agent missing or elevated: {ping}")
+        ctx["host_agent"] = ping["result"]
     base = codex_accounts() if ad.name == "codex-elevated" else None
     for g in groups:
         print(f"[{config}] {g} ...", flush=True)

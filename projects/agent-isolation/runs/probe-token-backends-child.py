@@ -11,6 +11,8 @@ only touched under the paths the harness passes in the spec (synthetic test file
 "open" tasks that open a real file for read access and close it without reading.
 Named objects and pipes (2026-11-26) use only synthetic iso-nq-* names; the only data written is a
 test string into synthetic sections and pipes. No pipe client is impersonated.
+"run" tasks (2026-11-26, T1-T6) start installed tools (Node, Git Bash, Git) with the test commands the
+harness passes; they touch only the workspace and its test repository.
 """
 import os
 import sys
@@ -784,6 +786,25 @@ def pipe_client(name, data):
     return out
 
 
+def run_tool(argv, cwd=None, timeout=30):
+    """T1-T6: run an installed tool (Node, Git Bash, Git) and keep its exit code and output tails.
+    Output is captured through anonymous pipes, which worked in all four configurations (ISO-11)."""
+    t0 = time.monotonic()
+    try:
+        # argv is passed unchanged: expandvars would replace $PATH in bash commands before bash sees them
+        p = subprocess.run(list(argv), cwd=expand(cwd) if cwd else None, capture_output=True,
+                           stdin=subprocess.DEVNULL, timeout=timeout)
+        return {"exit": p.returncode, "seconds": round(time.monotonic() - t0, 2),
+                "stdout": p.stdout.decode("utf-8", "replace")[-800:],
+                "stderr": p.stderr.decode("utf-8", "replace")[-800:]}
+    except subprocess.TimeoutExpired as e:
+        return {"exit": "timeout", "seconds": timeout,
+                "stdout": (e.stdout or b"").decode("utf-8", "replace")[-800:],
+                "stderr": (e.stderr or b"").decode("utf-8", "replace")[-800:]}
+    except OSError as e:
+        return {"exit": f"oserror:{getattr(e, 'winerror', None) or e.errno}"}
+
+
 def hold(seconds, hb, stop):
     end = time.time() + float(seconds)
     while time.time() < end and not Path(stop).exists():
@@ -854,6 +875,8 @@ def run_task(t):
         return pipe_client(t["name"], t["data"])
     if kind == "hold":
         return hold(t["seconds"], expand(t["heartbeat"]), expand(t["stop"]))
+    if kind == "run":
+        return run_tool(t["argv"], t.get("cwd"), t.get("timeout", 30))
     return f"unknown_kind:{kind}"
 
 

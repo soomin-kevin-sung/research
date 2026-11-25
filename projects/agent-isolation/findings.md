@@ -117,6 +117,7 @@ QwenPaw `2.3.0.post1`의 비관리자(`WindowsUnelevatedSandbox`)와 Codex CLI `
 | 작업 폴더 생성·읽기·이름 변경·삭제(B1) | 허용 5/5 | 허용 5/5 | 허용 5/5 | 허용 5/5 |
 | 임시 폴더 쓰기(B8) | 거부 5/5 | 허용 5/5 | 허용 5/5 | 허용 5/5(샌드박스 계정 프로필의 `Temp`) |
 | Python 다중 프로세스 병렬 작업(G4) | 실패 5/5(`WinError 5`) | 실패 5/5(`WinError 5`) | 성공 5/5 | 성공 5/5 |
+| Node 자식 프로세스(stdio `pipe`), Git Bash(2026-11-26) | 실패 5/5 | 실패 5/5 | 성공 5/5 | 성공 5/5. 사용자 소유 저장소의 `git status`는 거부 5/5 |
 | 셸이 끝난 뒤 남은 손자 프로세스, 표준 출력 상속(G2) | 손자가 끝날 때까지 호출이 반환되지 않음(약 32초) | 같음(25.5초) | 같음(26.7초) | 같음(32.7~33.4초) |
 | 호스트에서 같은 프로그램 직접 실행 | 0.17초 | 0.19초 | 0.17초 | 0.19초 |
 | 첫 명령(H1) | 0.25~0.34초 | 미측정 | 미측정 | 0.77~1.00초(계정 생성 포함) |
@@ -207,11 +208,26 @@ QwenPaw `2.3.0.post1`의 비관리자(`WindowsUnelevatedSandbox`)와 Codex CLI `
 - **`Local\`은 로그온 SID를 공유하는 세 구성에서 분리되지 않습니다.** `Local\` 디렉터리는 그 안에 만드는 모든 객체에 사용자 로그온 SID의 `GENERIC_ALL` ACE를 상속합니다. 제한 SID 목록에 이 로그온 SID가 있으므로 쓰기 검사도 통과합니다.
   - Codex가 기본 DACL로 의도한 실행 간 분리는 `Local\` 객체에 적용되지 않습니다. 상속 ACE가 기본 DACL보다 우선하기 때문입니다.
   - Codex `elevated`는 프로세스 열기에서 로그온 SID ACE가 없는 프로세스를 열지 못했지만, `Local\` 객체에는 이 ACE가 항상 붙어 모두 열었습니다.
-- **QwenPaw 관리자는 이름 있는 객체 호출 자체가 실패합니다.** `Local\`·`Global\` 모두 만들기와 열기가 `ERROR_ACCESS_DENIED`였습니다. 없는 `Global\` 이름도 "없음" 대신 "거부"가 나와, 세션 이름 공간 디렉터리를 여는 단계에서 실패한 것으로 봅니다. 호스트 객체는 보호되지만, 이름 있는 객체를 쓰는 프로그램은 이 샌드박스에서 실패할 수 있습니다.
+- **QwenPaw 관리자는 이름 있는 객체 호출 자체가 실패합니다.** `Local\`·`Global\` 모두 만들기와 열기가 `ERROR_ACCESS_DENIED`였습니다. 없는 `Global\` 이름도 "없음" 대신 "거부"가 나와, 세션 이름 공간 디렉터리를 여는 단계에서 실패한 것으로 봅니다. 호스트 객체는 보호되지만, kernel32 함수로 이름 있는 객체를 만드는 프로그램은 이 샌드박스에서 실패할 수 있습니다. Git Bash는 이 구성에서 동작했습니다(아래 실제 도구 결과).
 - **명명된 파이프의 기본 DACL은 토큰 기본 DACL을 따르지 않습니다.** SYSTEM·Administrators·소유자에게 모든 권한, Everyone·익명에게 읽기를 줍니다. 그래서 쓰기 가능 여부는 소유자 SID가 제한 SID 목록에 있는지로 갈립니다.
   - 비관리자 두 구성은 소유자가 사용자라서, 샌드박스는 자기 파이프에 쓰지 못하고 호스트는 그 파이프에 쓰거나 같은 이름에 서버를 추가할 수 있습니다.
   - Codex `elevated`는 소유자가 모든 작업 폴더가 같이 쓰는 샌드박스 계정이라, 다른 작업 폴더의 샌드박스가 씁니다.
 - **측정하지 않은 것.** 가장, 보안 설명자를 직접 지정하는 프로그램의 객체, `Global\` section(승격되지 않은 프로세스는 만들 수 없음), 실제 프로그램의 객체 이름.
+
+### 실제 도구: Node·Git Bash·Git (2026-11-26)
+
+설치된 Node v24.15.0과 Git for Windows 2.54.0을 네 구성에서 각 5회 실행했습니다. 같은 명령은 호스트에서 모두 성공했습니다. [실행 기록](runs/2026-11-26-02.md)
+
+| 명령 | QwenPaw 비관리자 | Codex `unelevated` | Codex `elevated` | QwenPaw 관리자 |
+| --- | --- | --- | --- | --- |
+| Node 단순 실행, `worker_threads`, stdio `inherit` 자식 프로세스 | 성공 | 성공 | 성공 | 성공 |
+| Node 자식 프로세스(stdio `pipe`: `spawnSync`·`spawn`·`execSync`), `fork` | **`EPERM`** | **`EPERM`** | 성공 | 성공 |
+| Node 명명된 파이프 서버에 연결 | **`EPERM`** | **`EPERM`** | 성공 | 성공 |
+| Git Bash(`echo`, 파이프라인, 명령 치환, 백그라운드) | **시작 실패**(`CreateFileMapping … Win32 error 5`) | **시작 실패** | 성공 | 성공 |
+| `git status`(사용자 소유 저장소) | 성공 | 성공 | 성공 | **거부**(`dubious ownership`) |
+
+- **비관리자 두 구성.** Node가 파이프로 띄우는 자식 프로세스와 Git Bash가 모두 동작하지 않습니다. 명명된 파이프와 같은 원인(사용자 SID에만 쓰기를 준 객체, 제한 SID 목록에 사용자 SID 없음)으로 추정합니다. `npm run`, 테스트 실행기, 빌드 도구와 Git Bash를 셸로 쓰는 에이전트([Hermes Agent](research/agents/hermes.md)의 Windows 로컬 터미널 등)는 이 두 구성의 샌드박스에서 쓸 수 없는 것으로 봅니다. 실제 `npm`·테스트 실행기는 측정하지 않았습니다.
+- **QwenPaw 관리자.** 도구는 모두 동작했지만, 사용자 소유 저장소에서 `git`이 저장소 소유자 검사로 거부됩니다. Codex `elevated`는 작업 폴더의 Git 루트를 `GIT_CONFIG_*` 환경 변수로 `safe.directory`에 넣어 이 문제를 피합니다. [Codex 소스](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/windows-sandbox-rs/src/sandbox_utils.rs#L36-L54)
 
 ## 측정하지 않은 항목과 후속 과제
 

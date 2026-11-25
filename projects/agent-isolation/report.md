@@ -30,7 +30,7 @@ Windows에서 직접 실행하는 에이전트 7종을 공식 문서와 릴리�
 - **이름 있는 객체(2026-11-26).** QwenPaw 비관리자와 Codex 두 구성은 호스트 프로그램이 `Local\`에 만든 이벤트·뮤텍스·세마포어·공유 메모리를 열어 읽고 썼습니다. 샌드박스가 먼저 만든 이름으로 호스트가 객체를 만들면 샌드박스의 객체와 내용을 그대로 받았습니다. `Local\` 객체는 사용자 로그온 SID의 모든 권한 ACE를 상속하기 때문입니다. [실행 기록](runs/2026-11-26-01.md)
 - **명명된 파이프(2026-11-26).** 현재 사용자 토큰을 쓰는 두 구성에서는 호스트가 샌드박스가 만든 파이프에 데이터를 보냈고, 같은 이름에 서버 인스턴스를 추가할 수 있었습니다. Codex `elevated`에서는 다른 작업 폴더의 샌드박스가 그 파이프에 데이터를 보냈습니다.
 
-QwenPaw 관리자만 사용자 프로세스와 다른 작업 폴더의 샌드박스를 열지 못했고, 사용자 로그온 SID에 쓰기를 준 위치에도 쓰지 못했습니다. 이름 있는 객체도 열지 못했지만, 이 샌드박스 안에서는 이름 있는 객체를 만드는 호출 자체가 실패했습니다.
+QwenPaw 관리자만 사용자 프로세스와 다른 작업 폴더의 샌드박스를 열지 못했고, 사용자 로그온 SID에 쓰기를 준 위치에도 쓰지 못했습니다. 이름 있는 객체도 열지 못했지만, 이 샌드박스 안에서는 kernel32 함수로 이름 있는 객체를 만드는 호출 자체가 실패했습니다. Git Bash는 이 구성에서 동작했습니다.
 
 ### 왜 그런가
 
@@ -46,10 +46,10 @@ QwenPaw 관리자만 사용자 프로세스와 다른 작업 폴더의 샌드박
 
 | 구성 | 판단 |
 | --- | --- |
-| QwenPaw 비관리자 | 작업 폴더 밖 쓰기를 경로 권한에 따라 막는 수준입니다. 읽기 제한, 작업 폴더 안 보호, 다른 프로세스 읽기 차단이 없습니다. |
-| Codex `unelevated` | 같은 경계에 작업 폴더 안 보호 경로, 작업 폴더별 capability SID, 별도 데스크톱이 더해집니다. 읽기와 다른 프로세스 읽기는 막지 않습니다. |
+| QwenPaw 비관리자 | 작업 폴더 밖 쓰기를 경로 권한에 따라 막는 수준입니다. 읽기 제한, 작업 폴더 안 보호, 다른 프로세스 읽기 차단이 없습니다. Git Bash와 Node의 파이프 자식 프로세스가 동작하지 않습니다. |
+| Codex `unelevated` | 같은 경계에 작업 폴더 안 보호 경로, 작업 폴더별 capability SID, 별도 데스크톱이 더해집니다. 읽기와 다른 프로세스 읽기는 막지 않습니다. Git Bash와 Node의 파이프 자식 프로세스가 동작하지 않습니다. |
 | Codex `elevated` | 별도 계정이라 사용자만 허용한 파일, `.ssh`, 사용자 레지스트리, 사용자 범위 DPAPI를 막습니다. 사용자의 로그온 SID를 공유해 사용자 데스크톱 프로세스가 열립니다. 모든 작업 폴더가 같은 계정과 프로필을 씁니다. |
-| QwenPaw 관리자 | 네 구성 중 사용자 파일·프로세스 분리가 가장 넓습니다. 대신 앱 전체를 관리자 권한으로 실행해야 하고, 사용자 데스크톱을 공유하며, 계정을 만들 때마다 PC에 항목이 남습니다. |
+| QwenPaw 관리자 | 네 구성 중 사용자 파일·프로세스 분리가 가장 넓습니다. 대신 앱 전체를 관리자 권한으로 실행해야 하고, 사용자 데스크톱을 공유하며, 계정을 만들 때마다 PC에 항목이 남습니다. 사용자 소유 저장소에서 `git`이 저장소 소유자 검사로 거부됩니다. |
 
 - **QwenPaw AppContainer.** 작업 폴더 밖 읽기·쓰기, 외부 네트워크, 호스트의 명명된 파이프를 Windows가 거부했습니다. 그러나 작업 폴더 안 하위 폴더 보호가 실패했고, 개발 도구 호환성이 낮으며, 에이전트 경로에서는 선택되지 않습니다. [QwenPaw 실측 보고서](report-qwenpaw-backends.md)
 - **QwenPaw의 승인 경로.** 기본 설정은 셸에 샌드박스를 적용하지 않습니다. 샌드박스가 막은 명령을 사용자가 승인하면 같은 명령이 격리 없이 다시 실행됐습니다(5/5). [승인 흐름 실측](runs/2026-11-24-07.md#1-iso-1518-승인-흐름-통합-시나리오마다-5회)
@@ -143,6 +143,10 @@ Codex `0.171.0`의 해당 경로는 **① 권한 확대 요청 심사 → ② �
 - **실측한 병렬 작업.** Python 다중 프로세스 병렬 작업은 QwenPaw 비관리자 Restricted Token, QwenPaw AppContainer, Codex `unelevated`에서 `WinError 5`로 실패했습니다. Codex `elevated`와 QwenPaw 관리자에서는 성공했습니다(각 5/5). [실행 기록](runs/2026-11-25-01.md#9-환경-변수-데스크톱-병렬-빌드-e-f-g4)
   - Restricted Token 두 구성의 원인은 2026-11-26에 확인했습니다. 파이프 서버는 만들어지고, 같은 프로세스가 그 파이프를 쓰기 권한으로 여는 단계에서 거부됩니다.
   - 보안 설명자 없이 만든 파이프는 소유자(사용자 SID)에게만 쓰기를 주는데, 두 구성의 제한 SID 목록에 사용자 SID가 없기 때문입니다. 성공한 두 구성은 소유자가 샌드박스 계정이고 그 SID가 제한 SID 목록에 있습니다. [실행 기록](runs/2026-11-26-01.md#q1-병렬-빌드-실패-단계)
+- **실측한 Node·Git Bash·Git(2026-11-26).** 같은 두 Restricted Token 구성(QwenPaw 비관리자, Codex `unelevated`)에서 다음 두 가지가 실패했습니다(각 5/5).
+  - Node가 자식 프로세스를 파이프로 띄우는 호출(`spawn`·`spawnSync`·`execSync`·`fork`)은 `EPERM`으로 실패했습니다.
+  - Git Bash는 시작 단계(`CreateFileMapping … Win32 error 5`)에서 실패했습니다.
+  - Codex `elevated`와 QwenPaw 관리자에서는 둘 다 동작했습니다. 다만 QwenPaw 관리자에서는 사용자 소유 저장소의 `git status`가 저장소 소유자 검사(`safe.directory`)로 거부됐습니다. Codex `elevated`는 작업 폴더의 Git 루트를 환경 변수로 `safe.directory`에 넣어 이 문제를 피합니다. [실행 기록](runs/2026-11-26-02.md)
 - **개발 서버와 파일 변경 감시.** Codex MXC는 전경 명령이 끝나면 남은 자식 프로세스도 종료합니다. 셸 명령이 반환된 뒤에도 서버나 워처가 계속 살아 있어야 하는 작업은 이 동작의 영향을 받습니다. [Codex Windows 샌드박스](https://learn.chatgpt.com/docs/windows/windows-sandbox#mxc-compatibility)
 - **Windows 앱과 사용자별 설정.** 창 조작, 입력, 클립보드에는 각각 별도 권한이 필요합니다. AppContainer나 별도 계정에서 실행하면 기존 Windows 사용자 프로필의 레지스트리 설정이나 로그인 상태를 읽는 도구도 따로 확인해야 합니다. [MXC UI 정책](https://github.com/microsoft/mxc/blob/main/docs/backends/process-container/UIPolicy_Schema.md) · [Microsoft AppContainer 격리](https://learn.microsoft.com/en-us/windows/win32/secauthz/appcontainer-isolation)
 
@@ -184,6 +188,7 @@ OpenClaw Hub V2가 새 승인에 저장하는 단위는 실행 파일과 인수�
 | QwenPaw 비관리자 Restricted Token, AppContainer | ISO-01~18 | [QwenPaw 실측 보고서](report-qwenpaw-backends.md) |
 | Restricted Token 네 구성(QwenPaw 비관리자·관리자, Codex `unelevated`·`elevated`) | 파일, 레지스트리, 다른 프로세스, 환경 변수, 데스크톱, 프로세스 수명, 시간, 남는 항목 | [사례별 보고서](report-token-backends/index.html) · [결과 및 판단](findings.md#restricted-token-네-구성-실측-2026-11-25) |
 | 같은 네 구성의 이름 있는 객체와 명명된 파이프 | 2026-11-26 추가 실측. 가장은 제외 | [결과 및 판단](findings.md#이름-있는-객체와-명명된-파이프-실측-2026-11-26) · [실행 기록](runs/2026-11-26-01.md) |
+| 같은 네 구성의 Node·Git Bash·Git | 2026-11-26 추가 실측. 실제 `npm`·테스트 실행기는 제외 | [결과 및 판단](findings.md#실제-도구-nodegit-bashgit-2026-11-26) · [실행 기록](runs/2026-11-26-02.md) |
 | MXC BaseContainer | 실측하지 않기로 함. 사용할 수 있는 장치와 비율만 정리 | [MXC 사용 가능 장치](research/solutions/mxc.md#사용할-수-있는-장치와-비율) |
 | OpenClaw, Codex 승인 흐름 | 미측정 | [후속 과제](findings.md#후속-과제) |
 
