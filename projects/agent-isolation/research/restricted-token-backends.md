@@ -4,7 +4,7 @@ QwenPaw와 Codex는 Windows에서 Restricted Token을 쓰는 샌드박스 백엔
 
 | 구성 | 버전 | 근거 |
 | --- | --- | --- |
-| QwenPaw 비관리자 백엔드 (`WindowsUnelevatedSandbox`) | `2.3.0.post1` | 소스 + [실측](../report-qwenpaw-backends.md) |
+| QwenPaw 비관리자 백엔드 (`WindowsUnelevatedSandbox`) | `2.3.0.post1` | 소스 + [2026-11-23~24 실측](../report-qwenpaw-backends.md) · [2026-11-25 실측](../runs/2026-11-25-01.md) |
 | QwenPaw 관리자 백엔드 (`WindowsElevatedSandbox`) | `2.3.0.post1` | 소스 + [실측](../runs/2026-11-25-02.md) |
 | Codex `unelevated` | CLI `0.171.0`(실측은 `0.172.0`, 샌드박스 코드 동일) | 소스 + [실측](../runs/2026-11-25-01.md) |
 | Codex `elevated` | CLI `0.171.0`(실측은 `0.172.0`, 샌드박스 코드 동일) | 소스 + [실측](../runs/2026-11-25-01.md) |
@@ -16,7 +16,7 @@ QwenPaw와 Codex는 Windows에서 Restricted Token을 쓰는 샌드박스 백엔
 - **액세스 토큰(이하 토큰).** 프로세스에 붙는 보안 정보입니다. 사용자 SID, 그룹 SID, 특권, 무결성 수준이 들어 있습니다. 프로세스가 파일을 열 때 Windows는 이 토큰과 파일의 DACL을 비교합니다.
 - **SID.** Security Identifier. 사용자, 그룹, 로그온 세션 등을 식별하는 값입니다. 앞부분 숫자로 종류가 나뉩니다. 예: 로컬·도메인 계정과 그룹 `S-1-5-21-…`, Everyone `S-1-1-0`, 로그온 SID `S-1-5-5-…`, AppContainer SID `S-1-15-2-…`, AppContainer capability SID `S-1-15-3-…`, 무결성 수준 `S-1-16-…`.
 - **DACL과 ACE.** DACL은 파일·폴더·레지스트리 키에 붙은 접근 허용·거부 목록이고, ACE는 그 항목 하나("이 SID에게 이 권한을 허용 또는 거부")입니다. 폴더의 ACE는 하위 파일·폴더로 상속되게 설정할 수 있습니다.
-- **`WRITE_RESTRICTED` 토큰.** 읽기는 원래 토큰의 사용자·그룹 SID로 DACL을 검사합니다. 쓰기는 이 검사에 더해, **제한 SID 목록**(restricting SID)에 있는 SID 중 하나가 DACL에서 쓰기 허용을 받았는지 한 번 더 검사합니다. [제한용 SID와 WRITE_RESTRICTED](solutions/windows-accounts-tokens.md#제한용-sid와-write_restricted)
+- **`WRITE_RESTRICTED` 토큰.** 읽기는 원래 토큰의 사용자·그룹 SID로 DACL을 검사합니다. 쓰기는 이 검사에 더해, **제한 SID 목록**(restricting SID)에 있는 SID 중 하나가 DACL에서 쓰기 허용을 받았는지 한 번 더 검사합니다. [제한 SID와 WRITE_RESTRICTED](solutions/windows-accounts-tokens.md#제한-sid와-write_restricted)
 - **capability SID(이 문서에서의 뜻).** QwenPaw와 Codex가 `S-1-5-21-a-b-c-d` 형식으로 무작위 생성하는 SID입니다. 어떤 계정에도 연결되지 않습니다. 제품은 이 SID를 토큰의 제한 SID 목록에 넣고, 쓰기를 허용할 폴더의 DACL에 이 SID의 쓰기 허용 ACE를 추가합니다. AppContainer의 capability SID(`S-1-15-3-…`)와 이름만 같고 다른 것입니다.
 - **방화벽 규칙과 Windows 필터링 플랫폼(WFP).** 특정 계정의 네트워크 연결을 운영체제 수준에서 차단하는 기능입니다.
 - **Windows 데이터 보호 API(DPAPI).** 비밀번호 같은 값을 암호화해 저장하는 Windows 기능입니다. 사용자 범위(그 사용자만 복호화)와 컴퓨터 범위(이 PC의 모든 계정이 복호화) 두 가지가 있습니다.
@@ -28,7 +28,7 @@ QwenPaw와 Codex는 Windows에서 Restricted Token을 쓰는 샌드박스 백엔
 - 제한 SID 목록에 무작위 capability SID, 로그온 SID, Everyone을 넣습니다.
 - 작업 폴더 DACL에 capability SID의 쓰기 허용 ACE를 추가합니다.
 
-그래서 QwenPaw 실측에서 나온 "DACL에 Everyone 쓰기 허용 ACE가 있는 폴더에는 쓰기가 허용된다"는 결과는 네 구성 모두에서 반복될 가능성이 높습니다.
+그래서 QwenPaw 실측에서 나온 "DACL에 Everyone 쓰기 허용 ACE가 있는 폴더에는 쓰기가 허용된다"는 결과는 네 구성 모두에서 반복됐습니다(2026-11-25 실측 B3, 각 5/5).
 
 **구성 간 차이.**
 
@@ -42,7 +42,7 @@ QwenPaw와 Codex는 Windows에서 Restricted Token을 쓰는 샌드박스 백엔
 | 읽기 거부 요청 | 경고만 하고 실행 | 실행을 거부 | 기존 경로에 전용 계정 SID 대상 거부 ACE | 샌드박스 그룹 SID 대상 거부 ACE |
 | 네트워크 차단 | 프록시 환경 변수 | 프록시 환경 변수 + 오프라인 환경 변수 + `ssh`·`scp` 실패용 대체 파일 | 전용 계정 방화벽 규칙 | 오프라인 계정 방화벽 규칙 + WFP 필터 |
 | 데스크톱 | 사용자 기본 데스크톱 | 별도 데스크톱 | 사용자 기본 데스크톱(전용 계정에 접근 권한 부여) | 별도 데스크톱 |
-| 셸 종료 후 자식 프로세스 | 도구 호출이 반환되지 않음(실측) | 종료하지 않음(의도된 동작) | 비관리자와 같은 대기 방식(미측정) | 종료하지 않음(의도된 동작) |
+| 셸 종료 후 자식 프로세스 | 도구 호출이 반환되지 않음(실측) | 종료하지 않음(의도된 동작) | 비관리자와 같음. 도구 호출이 반환되지 않음(실측) | 종료하지 않음(의도된 동작) |
 | ACE 정리 | 정리 함수가 삭제 | 삭제하지 않음 | 정리 함수가 계정·방화벽 규칙·ACE 삭제 | 삭제하지 않음(계정·방화벽 규칙도 유지) |
 
 정리하면 다음과 같습니다.
@@ -129,7 +129,7 @@ QwenPaw와 Codex는 Windows에서 Restricted Token을 쓰는 샌드박스 백엔
   - 상위 읽기 거부 + 하위 허용: 별도 계정 두 구성의 결과가 갈렸습니다.
     - Codex `elevated`, 쓰기 허용 하위 폴더: Codex가 명시적 허용 ACE를 달아, 상위에서 상속된 거부보다 먼저 적용됐습니다.
     - Codex `elevated`, 읽기 허용 하위 폴더: Codex가 ACE를 달지 않아 상속된 거부가 남았고, 읽지 못했습니다. 그 경로를 이미 `Authenticated Users`가 읽을 수 있어서 읽기 ACE를 추가하지 않는 조건에 해당했습니다.
-    - QwenPaw 관리자: 읽기 전용 mount에도 명시적 읽기 허용 ACE를 달기 때문에 두 하위 폴더 모두 접근됐습니다.
+    - QwenPaw 관리자: 읽기 전용 마운트에도 명시적 읽기 허용 ACE를 달기 때문에 두 하위 폴더 모두 접근됐습니다.
   - 쓰기 가능한 작업 폴더 안 폴더(`.key`) 거부: Codex `elevated`와 QwenPaw 관리자 모두 읽기·목록·쓰기·삭제를 막았습니다. Codex `elevated`는 작업 폴더 안에서는 읽기 거부 ACE에 쓰기·삭제 거부 ACE를 더했습니다.
   - [실측](../runs/2026-11-25-04.md)
 - **`elevated` 계열의 읽기 범위.**
@@ -142,7 +142,7 @@ QwenPaw와 Codex는 Windows에서 Restricted Token을 쓰는 샌드박스 백엔
   - 다른 계정을 써도 읽기가 넓은 이유는 두 가지입니다. 첫째, 위의 읽기 허용 ACE가 사용자 프로필의 기본 DACL(SYSTEM, Administrators, 사용자 본인만 허용)을 넓힙니다. 둘째, 프로필 밖의 폴더는 Windows 기본 DACL이 Users나 Authenticated Users에 읽기를 허용하는 경우가 많아, 어느 로컬 계정이든 읽을 수 있습니다.
   - 제외되는 것은 `.ssh`, `.tsh`, `.brev`, `.gnupg`, `.aws`, `.azure`, `.kube`, `.docker`, `.config`, `.npm`, `.pki`, `.terraform.d`와 `~/.ssh/config`의 `IdentityFile`·`Include`가 가리키는 경로입니다. 제외는 읽기 허용 ACE를 추가하지 않는다는 뜻이며, 거부 ACE를 추가하지는 않습니다.
   - `AppData`, `.codex`는 제외 목록에 없습니다. Codex 시험 코드도 `AppData`가 제외 대상이 아님을 확인합니다. 프로필 바로 아래의 `.gitconfig`, `.npmrc` 같은 파일도 이름이 목록에 없으면 읽기 허용 ACE를 받습니다. [제외 목록](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/windows-sandbox-rs/src/setup.rs#L59-L78) · [`AppData` 시험](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/windows-sandbox-rs/src/setup.rs#L2263-L2298)
-  - 따라서 `~/.codex` 아래의 인증·설정 파일을 샌드박스 계정이 읽을 수 있는지가 실측에서 먼저 확인할 항목입니다. 비밀번호 폴더(`.sandbox-secrets`)에만 거부 ACE가 있습니다.
+  - 따라서 소스 기준으로는 `~/.codex` 아래의 인증·설정 파일을 샌드박스 계정이 읽을 수 있습니다. 비밀번호 폴더(`.sandbox-secrets`)에만 거부 ACE가 있습니다. 실측에서 `config.toml`과 `auth.json`은 읽기 권한으로 열렸고, `.sandbox-secrets`의 파일은 거부됐습니다(2026-11-25 C3, 각 5/5).
 - [Codex 비관리자 읽기 제약](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/windows-sandbox-rs/src/lib.rs#L746-L755) · [Codex 실행 거부 조건](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/sandboxing/src/windows.rs#L115-L162) · [Codex 읽기 허용 경로](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/windows-sandbox-rs/src/setup.rs#L591-L621) · [Codex 읽기 거부 적용](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/windows-sandbox-rs/src/setup_provisioning.rs#L998-L1015)
 
 ## 5. 네트워크
@@ -258,7 +258,7 @@ Restricted Token 자체에는 네트워크 연결을 제한하는 기능이 없�
   - 예외가 있습니다. 같은 설정의 다음 실행은 `icacls` 출력에서 이전 capability SID를 찾아 재사용 여부를 정합니다.
   - SID 조회가 실패하는 PC(도메인 트러스트 오류 등)에서는 `icacls`가 SID를 출력하지 않아 이 확인이 항상 실패합니다. 그러면 새 SID로 메타데이터를 덮어쓰고 이전 ACE는 기록 없이 계속 남습니다(2026-11-25 실측, 강제 종료 15회 → ACE 15개). [실측](../runs/2026-11-25-01.md#6-qwenpaw-작업-폴더에-남은-capability-sid-ace)
 - **QwenPaw 관리자(2026-11-25 실측).** 정리 함수는 다음을 지웠습니다.
-  - 지운 것: 계정, 프로필 폴더, 메타데이터, 시험 경로의 ACE(작업 폴더, mount, 거부 폴더, 관리자 소유 폴더).
+  - 지운 것: 계정, 프로필 폴더, 메타데이터, 시험 경로의 ACE(작업 폴더, 마운트, 거부 폴더, 관리자 소유 폴더).
     - ACE 제거는 Win32 API로 하므로 도메인 트러스트 오류의 영향을 받지 않았습니다.
     - 명령 실행 중에 작업자를 강제 종료하면 계정과 메타데이터가 남고, 다음 실행의 정리가 지웠습니다.
   - 정리 뒤에도 남은 것: 다음 항목이 **계정을 만들 때마다 하나씩** 남았습니다.
@@ -316,7 +316,7 @@ QwenPaw에서 실행 후 항목이 남는 것은 정리 실패입니다. Codex�
 | 명명된 파이프 병렬 빌드 | 실패(`WinError 5`) | 성공 | 성공 |
 | 다른 프로세스 접근 | 사용자 프로세스 거의 전부를 메모리 읽기·종료·토큰 복제 권한으로 열 수 있음 | DACL이 로그온 SID에 권한을 주는 사용자 프로세스를 같은 권한으로 열 수 있음. 실행기는 모든 권한으로 열림 | 사용자 프로세스, 다른 작업 폴더 샌드박스, 승격된 작업자 모두 거부(`QUERY_LIMITED`만 22개) |
 | 데스크톱 | 사용자 데스크톱에 창이 보이지 않음 | 같음 | 사용자 데스크톱에 창이 보임. 샌드박스 계정에 `WinSta0`·`Default` 전체 권한 ACE |
-| 사용자가 DACL을 바꿀 수 없는 폴더를 쓰기 경로로 지정(B10) | 실행, 쓰기 거부 | 명령 실행 거부(갱신 단계 `WRITE_DAC` 실패) | 관리자 권한으로 ACE를 추가해 씀 |
+| 사용자가 DACL을 바꿀 수 없는 폴더를 쓰기 경로로 지정(B10) | 실행, 쓰기 거부(1회 측정) | 명령 실행 거부(갱신 단계 `WRITE_DAC` 실패) | 관리자 권한으로 ACE를 추가해 씀 |
 | 다른 계정 하이브(R2) | QwenPaw 관리자 계정 하이브 읽기 거부 | — | 다른 비관리자 구성이 이 계정 하이브를 열지 못함 |
 | 작업 폴더 사이 계정 상태 공유(R3) | — | 공유. 한 작업 폴더의 명령이 샌드박스 계정 프로필에 만든 파일을 다른 작업 폴더의 명령이 읽고 지움. HKCU는 `.DEFAULT`라 쓰기 거부([실측](../runs/2026-11-25-03.md)) | 직접 측정 안 함. 작업 폴더마다 계정·프로필이 다름(B8b·P6) |
 

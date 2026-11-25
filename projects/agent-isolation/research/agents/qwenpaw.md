@@ -4,7 +4,7 @@
 
 [조사 목록](../README.md)
 
-관련 기술은 [AppContainer](../solutions/appcontainer.md) · [전용 계정·제한 토큰·ACL·WFP](../solutions/windows-accounts-tokens.md)에서 설명합니다.
+관련 기술은 [AppContainer](../solutions/appcontainer.md) · [전용 계정·Restricted Token·ACL·WFP](../solutions/windows-accounts-tokens.md)에서 설명합니다.
 
 ## 거버넌스와 실제 실행 경로
 
@@ -28,7 +28,7 @@ AppContainer 프로필은 동일 구성에서 재사용됩니다. [Windows 프�
 
 ### Restricted Token으로 셸을 실행하는 방식
 
-Windows 샌드박스 분기에서 기본값 `allow_read_all=True`이면 QwenPaw는 `CreateRestrictedToken`으로 제한용 SID 목록이 있는 토큰을 만들고 `WRITE_RESTRICTED`를 적용합니다. QwenPaw는 작업 폴더 등 쓰기를 허용한 경로의 ACL에 샌드박스용 SID 권한을 부여하고, 생성한 토큰으로 셸을 시작합니다. 쓰기에는 실행 계정의 일반 검사와 제한용 SID 검사가 모두 적용되고, 읽기에는 일반 검사만 적용됩니다. [두 권한 검사의 차이](../solutions/windows-accounts-tokens.md#제한용-sid와-write_restricted) · [비관리자 토큰 생성 코드](https://github.com/agentscope-ai/QwenPaw/blob/v2.3.0.post1/src/qwenpaw/sandbox/windows_unelevated_sandbox.py#L1519-L1574)
+Windows 샌드박스 분기에서 기본값 `allow_read_all=True`이면 QwenPaw는 `CreateRestrictedToken`으로 제한 SID 목록이 있는 토큰을 만들고 `WRITE_RESTRICTED`를 적용합니다. QwenPaw는 작업 폴더 등 쓰기를 허용한 경로의 ACL에 샌드박스용 SID 권한을 부여하고, 생성한 토큰으로 셸을 시작합니다. 쓰기에는 실행 계정의 일반 검사와 제한 SID 검사가 모두 적용되고, 읽기에는 일반 검사만 적용됩니다. [두 권한 검사의 차이](../solutions/windows-accounts-tokens.md#제한-sid와-write_restricted) · [비관리자 토큰 생성 코드](https://github.com/agentscope-ai/QwenPaw/blob/v2.3.0.post1/src/qwenpaw/sandbox/windows_unelevated_sandbox.py#L1519-L1574)
 
 비관리자 경로는 QwenPaw를 실행한 Windows 사용자의 토큰에서 시작합니다. 관리자 경로는 별도 저권한 샌드박스 계정의 토큰에서 시작합니다. 관리자 경로는 설정 시 존재하는 `deny_paths` 항목에 이 전용 계정의 접근 거부 ACE를 적용하며, 그 거부는 일반 권한 검사에서 효력이 있습니다. 비관리자 경로의 Web Console **Deny Paths Protection**은 선택 기능으로, 같은 Windows 사용자로 실행되는 다른 프로세스에도 영향을 줄 수 있는 ACL을 사용합니다. [관리자 경로 구현](https://github.com/agentscope-ai/QwenPaw/blob/v2.3.0.post1/src/qwenpaw/sandbox/windows_elevated_sandbox.py) · [비관리자 경로 구현](https://github.com/agentscope-ai/QwenPaw/blob/v2.3.0.post1/src/qwenpaw/sandbox/windows_unelevated_sandbox.py#L1980-L2010)
 

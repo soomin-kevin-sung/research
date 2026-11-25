@@ -198,13 +198,13 @@ footer { color: var(--muted); font-size: 13px; display: flex; flex-direction: co
   <h1>Restricted Token 샌드박스, 사례로 보는 막힘과 뚫림</h1>
   <div class="answer">
     <p class="big">쓰기는 막히고, 읽기는 토큰의 계정만큼 뚫립니다.</p>
-    <p>에이전트가 실행하는 명령이 실제로 할 법한 일 19가지를 네 구성에서 5회씩 시험했습니다. 사례마다 네 구성이 <b>어느 검사에서 막혔는지, 또는 왜 통과했는지</b>를 보여 줍니다.</p>
+    <p>에이전트가 실행하는 명령이 실제로 할 법한 일 19가지를 네 구성에서 시험했습니다. 사례마다 네 구성이 <b>어느 검사에서 막혔는지, 또는 왜 통과했는지</b>를 보여 줍니다.</p>
   </div>
 
   <div class="cfgs" role="list">
     <div class="cfg q" role="listitem"><b>QwenPaw 비관리자</b><dl><dt>토큰 계정</dt><dd>나(현재 사용자)</dd><dt>로그온 SID</dt><dd>나와 같음</dd><dt>제한 SID</dt><dd>capability SID, 로그온 SID, Everyone</dd><dt>필요 권한</dt><dd>일반 사용자</dd></dl></div>
     <div class="cfg c" role="listitem"><b>Codex unelevated</b><dl><dt>토큰 계정</dt><dd>나(현재 사용자)</dd><dt>로그온 SID</dt><dd>나와 같음</dd><dt>제한 SID</dt><dd>capability SID 2개, 로그온 SID, Everyone</dd><dt>필요 권한</dt><dd>일반 사용자</dd></dl></div>
-    <div class="cfg c" role="listitem"><b>Codex elevated</b><dl><dt>토큰 계정</dt><dd>고정 샌드박스 계정(모든 작업 공유)</dd><dt>로그온 SID</dt><dd>나와 같음</dd><dt>제한 SID</dt><dd>capability SID 2개, 샌드박스 계정, 로그온 SID, Everyone</dd><dt>필요 권한</dt><dd>설치 때만 관리자</dd></dl></div>
+    <div class="cfg c" role="listitem"><b>Codex elevated</b><dl><dt>토큰 계정</dt><dd>고정 샌드박스 계정(모든 작업 폴더 공유)</dd><dt>로그온 SID</dt><dd>나와 같음</dd><dt>제한 SID</dt><dd>capability SID 2개, 샌드박스 계정, 로그온 SID, Everyone</dd><dt>필요 권한</dt><dd>설치 때만 관리자</dd></dl></div>
     <div class="cfg q" role="listitem"><b>QwenPaw 관리자</b><dl><dt>토큰 계정</dt><dd>작업 폴더마다 새 계정</dd><dt>로그온 SID</dt><dd>나와 다름(새 세션)</dd><dt>제한 SID</dt><dd>capability SID, 샌드박스 계정, 자기 로그온 SID, Everyone</dd><dt>필요 권한</dt><dd>앱 전체를 관리자로</dd></dl></div>
   </div>
 
@@ -273,16 +273,16 @@ footer { color: var(--muted); font-size: 13px; display: flex; flex-direction: co
     <div class="card"><b>네 구성이 모두 막지 못한 것</b>
       <ul><li>Everyone 쓰기 허용 위치(사례 2)</li><li>Users·Everyone이 읽을 수 있는 파일(사례 7)</li><li>컴퓨터 범위 DPAPI 값(사례 8)</li><li>환경 변수의 비밀값(사례 15)</li><li>쓰기 허용 하위 폴더 통째 삭제(사례 18)</li></ul></div>
     <div class="card"><b>토큰 계정에 따라 갈린 것</b>
-      <ul><li>현재 사용자 토큰 두 구성은 사용자가 읽는 파일과 사용자 프로세스를 그대로 엶(사례 5, 6, 10)</li><li>Codex elevated는 별도 계정이지만 사용자 로그온 SID를 공유해 데스크톱 프로세스가 열림(사례 10). 고정 계정이라 작업 폴더끼리 공유(사례 12, 13)</li><li>QwenPaw 관리자만 사용자 프로세스와 옆 샌드박스를 막음(사례 10, 12). 대신 앱 전체가 관리자로 실행되고, 사용자 권한 밖 경로도 열어 줌(사례 19)</li></ul></div>
+      <ul><li>현재 사용자 토큰 두 구성은 사용자가 읽는 파일과 사용자 프로세스를 그대로 엶(사례 5, 6, 10)</li><li>Codex elevated는 별도 계정이지만 사용자 로그온 SID를 공유해 데스크톱 프로세스가 열림(사례 10). 고정 계정이라 작업 폴더끼리 공유(사례 12, 13)</li><li>QwenPaw 관리자만 사용자 프로세스와 다른 작업 폴더의 샌드박스를 막음(사례 10, 12). 대신 앱 전체가 관리자로 실행되고, 사용자 권한 밖 경로도 열어 줌(사례 19)</li></ul></div>
     <div class="card"><b>판단</b>
-      <ul><li>신뢰하는 에이전트의 실수로 작업 폴더 밖을 고치는 것은 네 구성 모두 막습니다.</li><li>비밀 파일과 다른 프로그램까지 보호하려면 별도 계정과 별도 로그온 세션이 필요했습니다(QwenPaw 관리자).</li><li>신뢰하지 않는 코드를 가두는 경계로는 네 구성 모두 부족합니다. 가상 머신 같은 별도 경계가 필요합니다.</li></ul></div>
+      <ul><li>신뢰하는 에이전트의 실수로 작업 폴더 밖을 고치는 것은 네 구성 모두 막습니다. Everyone에 쓰기를 준 위치는 예외입니다(사례 2).</li><li>비밀 파일과 다른 프로그램까지 보호하려면 별도 계정과 별도 로그온 세션이 필요했습니다(QwenPaw 관리자).</li><li>신뢰하지 않는 코드를 가두는 경계로는 네 구성 모두 부족합니다. 가상 머신 같은 별도 경계가 필요합니다.</li></ul></div>
   </div>
   <div class="card"><b>측정 방법</b>
     <ul>
-      <li>네 구성에 같은 시험 프로그램, 사례마다 5회. 막혔다고 보기 전에 같은 대상이 원래 열리는지 먼저 확인했습니다.</li>
+      <li>네 구성에 같은 시험 프로그램을 쓰고 사례마다 5회 측정했습니다. 사례 19의 Codex unelevated만 1회입니다. 막혔다고 보기 전에 같은 대상이 원래 열리는지 먼저 확인했습니다.</li>
       <li>다른 프로세스·토큰·키는 지정한 권한으로 열고 바로 닫기만 했습니다. 메모리 읽기·쓰기, 가장, 종료, 알려진 우회 기법은 시도하지 않았습니다.</li>
-      <li>실제 사용 PC에서 측정 전후 상태를 기록하고 원래대로 되돌렸습니다. QwenPaw 관리자는 사용자가 승인한 관리자 세션에서 측정했습니다.</li>
-      <li>네트워크 차단과 클립보드는 측정하지 않았습니다. 사례 13의 QwenPaw 관리자 프로필 분리는 직접 측정하지 않은 간접 근거입니다.</li>
+      <li>실제 사용 PC에서 측정 전후 상태를 기록하고 비교했습니다. 측정이 만든 계정·ACE·시험 폴더는 지웠습니다. 사용자 결정으로 두 가지는 그대로 두었습니다. Codex <code>cap_sid</code> 파일의 시험 경로 항목은 지금은 없는 폴더 경로라 권한을 주지 않습니다. 실수 실행으로 프로필 아래 폴더 2개에 생긴 <code>CodexSandboxUsers</code> 읽기 ACE는 Codex elevated가 평소 실행 때도 추가합니다. QwenPaw 관리자는 사용자가 승인한 관리자 세션에서 측정했습니다.</li>
+      <li>네트워크 차단과 클립보드는 측정하지 않았습니다. MXC BaseContainer도 측정하지 않았습니다. 사례 13의 QwenPaw 관리자 프로필 분리는 직접 측정하지 않은 간접 근거입니다.</li>
     </ul></div>
   <footer>
     <span>근거: 실행 기록 <a href="../runs/2026-11-25-01.md">2026-11-25-01</a>, <a href="../runs/2026-11-25-02.md">02</a>, <a href="../runs/2026-11-25-03.md">03</a>, <a href="../runs/2026-11-25-04.md">04</a>, 판단 <a href="../findings.md">findings.md</a>. 사례 옆 근거 표시(B2, C3 등)는 <a href="../plan-token-backends.md">측정 계획</a>의 항목 이름입니다.</span>

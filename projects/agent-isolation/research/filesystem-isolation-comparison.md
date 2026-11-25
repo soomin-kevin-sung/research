@@ -1,6 +1,6 @@
 # Windows 셸의 파일 권한과 읽기 거부 비교
 
-Codex `0.171.0`, QwenPaw `2.3.0.post1`의 Windows 셸과 자식 프로세스를 비교합니다. 결과는 문서·소스 기준이며 Windows 실측 전입니다.
+Codex `0.171.0`, QwenPaw `2.3.0.post1`의 Windows 셸과 자식 프로세스를 비교합니다. 이 문서의 내용은 문서·소스 기준입니다. QwenPaw와 Codex `unelevated`·`elevated`의 실측 결과는 [결과 및 판단](../findings.md#restricted-token-네-구성-실측-2026-11-25)과 [상위·하위 폴더 권한 조합 실행 기록](../runs/2026-11-25-04.md)에 있습니다. MXC BaseContainer는 측정하지 않았습니다.
 
 ## 실행 방식
 
@@ -8,10 +8,10 @@ Codex `0.171.0`, QwenPaw `2.3.0.post1`의 Windows 셸과 자식 프로세스를 
 | --- | --- | --- |
 | Codex MXC BaseContainer | MXC SDK가 Windows PSEC 정책을 적용한 프로세스를 시작합니다. | 파일의 읽기·쓰기·거부 경로를 명령별 정책으로 전달합니다. 명시적 거부에는 호스트의 네이티브 경로 거부 기능이 필요합니다. |
 | QwenPaw AppContainer | AppContainer SID와 capability를 셸에 부여합니다. | 읽기와 쓰기에 컨테이너 권한이 적용됩니다. 허용 경로에 SID별 ACL을 설정합니다. |
-| QwenPaw Restricted Token | 비관리자는 현재 사용자, 관리자는 별도 저권한 계정의 토큰을 사용합니다. | `WRITE_RESTRICTED`로 제한용 SID 검사를 쓰기에만 추가합니다. 읽기는 실행 계정의 일반 권한과 ACL을 따릅니다. |
-| Codex `elevated` | 관리자 권한으로 초기 설정을 하고, 실제 셸은 별도 저권한 계정의 제한 토큰으로 실행합니다. | QwenPaw 관리자 경로와 마찬가지로 `WRITE_RESTRICTED`와 ACL을 사용합니다. 명시적 읽기 거부는 파일 ACL로 적용할 수 있습니다. |
+| QwenPaw Restricted Token | 비관리자는 현재 사용자, 관리자는 별도 저권한 계정의 토큰을 사용합니다. | `WRITE_RESTRICTED`로 제한 SID 검사를 쓰기에만 추가합니다. 읽기는 실행 계정의 일반 권한과 ACL을 따릅니다. |
+| Codex `elevated` | 관리자 권한으로 초기 설정을 하고, 실제 셸은 별도 저권한 계정의 Restricted Token으로 실행합니다. | QwenPaw 관리자 경로와 마찬가지로 `WRITE_RESTRICTED`와 ACL을 사용합니다. 명시적 읽기 거부는 파일 ACL로 적용할 수 있습니다. |
 
-Restricted Token은 Windows 기능입니다. Codex `elevated`는 그 기능과 계정·ACL·방화벽을 조합한 구현으로, 이름의 `elevated`는 **초기 설정에 필요한 관리자 권한**을 뜻합니다. [Codex MXC 구현](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/mxc-sandbox/README.md) · [Codex elevated 설계](https://openai.com/index/building-codex-windows-sandbox/) · [QwenPaw 백엔드 선택](https://github.com/agentscope-ai/QwenPaw/blob/v2.3.0.post1/src/qwenpaw/sandbox/config.py#L800-L816) · [제한 토큰 검사](solutions/windows-accounts-tokens.md#제한용-sid와-write_restricted)
+Restricted Token은 Windows 기능입니다. Codex `elevated`는 그 기능과 계정·ACL·방화벽을 조합한 구현으로, 이름의 `elevated`는 **초기 설정에 필요한 관리자 권한**을 뜻합니다. [Codex MXC 구현](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/mxc-sandbox/README.md) · [Codex elevated 설계](https://openai.com/index/building-codex-windows-sandbox/) · [QwenPaw 백엔드 선택](https://github.com/agentscope-ai/QwenPaw/blob/v2.3.0.post1/src/qwenpaw/sandbox/config.py#L800-L816) · [Restricted Token 검사](solutions/windows-accounts-tokens.md#제한-sid와-write_restricted)
 
 ## 상위 허용과 하위 보호
 
@@ -32,7 +32,7 @@ Restricted Token은 Windows 기능입니다. Codex `elevated`는 그 기능과 �
 | --- | --- |
 | MXC BaseContainer | Microsoft 스키마는 상위가 `deniedPaths`에 있어도 명시적으로 `readwritePaths`에 넣은 하위는 읽고 쓸 수 있고, 다른 하위는 거부된다고 명시합니다. 같은 하위 경로를 허용과 거부에 모두 지정하면 거부됩니다. Codex의 유효 프로필이 이 조합을 실제로 전달하는지와 상위 탐색이 필요한 도구의 호환성은 별도 확인합니다. |
 | QwenPaw AppContainer | 상위에 컨테이너 접근 허용이 없고 하위만 허용한 경우와, 상위에 상속되는 명시적 거부 ACE를 준 경우를 구분합니다. 후자는 하위의 직접 허용, 상속 거부 및 경로 탐색에 따라 결과가 달라집니다. 조사 버전의 설정 경로에서 조합 전체를 보장하는 근거는 확인하지 못했습니다. |
-| QwenPaw Restricted Token | 비관리자 기본 백엔드는 명시적 상위 읽기 거부를 집행하지 않습니다. 관리자 경로는 기존 부모에 전용 계정 거부 ACE를 설정할 수 있습니다. 하위 허용이 동일 실행 계정과 제한 토큰에서 유효한지는 실제 ACL과 경로 탐색 권한을 확인해야 합니다. |
+| QwenPaw Restricted Token | 비관리자 기본 백엔드는 명시적 상위 읽기 거부를 집행하지 않습니다. 관리자 경로는 기존 부모에 전용 계정 거부 ACE를 설정할 수 있습니다. 하위 허용이 동일 실행 계정과 Restricted Token에서 유효한지는 실제 ACL과 경로 탐색 권한을 확인해야 합니다. |
 | Codex `elevated` | ACL의 직접·상속 권한에 따라 결과가 정해집니다. 조사 버전이 거부하는 것은 **쓰기 허용 영역 안의 읽기 전용 구간 아래에 쓰기를 다시 여는 조합**입니다. 상위의 명시적 읽기 거부 아래에 읽기만 다시 여는 조합은 별도로 실측합니다. |
 
 Windows의 `SeChangeNotifyPrivilege`는 허용된 하위 경로로 이동할 때 상위 경로의 탐색 검사를 건너뛰게 할 수 있습니다. 이 권한으로 상위 폴더의 목록 조회나 하위 파일 자체의 읽기·쓰기 권한이 생기지는 않습니다. NTFS에서는 직접 지정한 ACE와 상속 ACE의 평가 순서도 확인해야 합니다. [MXC 상하위 우선순위](https://github.com/microsoft/mxc/blob/main/docs/schema.md#overlapping-paths-for-windows-basecontainer) · [Windows 경로 탐색 권한](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/security-policy-settings/bypass-traverse-checking) · [Windows DACL 평가 순서](https://learn.microsoft.com/en-us/windows/win32/secauthz/order-of-aces-in-a-dacl) · [Codex elevated 제약](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/sandboxing/src/windows.rs#L217-L227)

@@ -6,7 +6,7 @@
 
 | 프로젝트 | 상태 | 다음 작업 |
 | --- | --- | --- |
-| [에이전트 격리 솔루션 실측조사](projects/agent-isolation/README.md) | 진행 | Restricted Token 계열 네 구성(QwenPaw 비관리자·관리자, Codex `unelevated`·`elevated`) 비교 실측 완료(2026-11-25). 다음은 MXC BaseContainer |
+| [에이전트 격리 솔루션 실측조사](projects/agent-isolation/README.md) | 완료 | 없음. 2026-11-25에 종료했고, 완료 기준 4개 중 3개를 충족했습니다. MXC BaseContainer 실측, Codex 승인 흐름 실측, 네트워크 차단 실측은 [후속 과제](projects/agent-isolation/findings.md#후속-과제)로 남겼습니다 |
 
 ## 운영 방식
 
