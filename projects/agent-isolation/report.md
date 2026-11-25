@@ -99,7 +99,7 @@ MXC는 실측하지 않았습니다. 대신 쓸 수 있는 장치의 범위와 �
 | 권한 확대 후 필수 제한 유지 | 예외를 승인하고도 명시적 파일 읽기 거부를 유지합니다. | 필요한 제한을 집행할 백엔드가 없으면 실행이 차단됩니다. | Codex의 명시적 읽기 거부가 있는 권한 확대 경로 |
 | 격리 차단 후 별도 승인으로 호스트 재시도 | 일부 격리 차단을 사용자의 추가 승인으로 재시도할 수 있습니다. | 재시도에는 호스트 권한이 적용됩니다. 격리 실행만 허용한 모델 판정에는 이 분기가 적용되지 않습니다. | QwenPaw의 일반 샌드박스 차단 경로 |
 
-[상세 흐름도](../../approval-patterns-detailed.html) · [제품별 승인 정책](research/approval-policies.md)
+[상세 흐름도](figures/approval-patterns-detailed.html) · [제품별 승인 정책](research/approval-policies.md)
 
 QwenPaw의 관리자 Restricted Token 경로와 Codex `elevated`는 별도 저권한 Windows 계정, Restricted Token, 파일 ACL을 사용합니다. 차단 이후의 동작은 제품의 승인 정책이 결정합니다. QwenPaw는 일반 샌드박스 실행의 결과를 격리 위반으로 분류하면 별도 인간 승인을 거쳐 호스트에서 비격리로 재시도할 수 있습니다. Codex는 별도 권한 확대 요청을 승인받더라도, 명시적 읽기 거부가 설정된 경로에서는 그 제한을 유지한 채 실행합니다. 차단만으로 확대 승인 요청이 자동으로 발생하지는 않습니다. [QwenPaw 재시도 코드](https://github.com/agentscope-ai/QwenPaw/blob/v2.3.0.post1/src/qwenpaw/governance/tool_adapter.py#L476-L603) · [Codex 권한 확대 분기](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/core/src/tools/sandboxing.rs#L242-L256)
 
