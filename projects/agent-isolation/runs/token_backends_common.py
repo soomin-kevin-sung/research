@@ -20,7 +20,7 @@ QP_PROFILE = ROOT / "qwenpaw-profile"
 TARGETS = ROOT / "targets"
 BACKUP = Path(r"C:\agent-isolation-backup")
 REPO = Path(__file__).resolve().parents[1]
-LOCAL = REPO / "local" / "2026-11-25"
+LOCAL = REPO / "local" / os.environ.get("ISO_DATE", "2026-11-25")  # ISO_DATE=2026-11-26 for the named object run
 CONFIGS = ("qwenpaw-unelevated", "qwenpaw-admin", "codex-unelevated", "codex-elevated")
 CODEX = Path(os.environ["APPDATA"]) / r"npm\node_modules\@openai\codex\node_modules\@openai\codex-win32-x64\vendor\x86_64-pc-windows-msvc\bin\codex.exe"
 REAL_CODEX_HOME = Path(os.environ["USERPROFILE"]) / ".codex"

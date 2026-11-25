@@ -9,6 +9,8 @@ Safety: other processes, tokens and registry keys are only opened and closed. No
 read or written, no token is duplicated or impersonated, no registry value is written. Files are
 only touched under the paths the harness passes in the spec (synthetic test files), except
 "open" tasks that open a real file for read access and close it without reading.
+Named objects and pipes (2026-11-26) use only synthetic iso-nq-* names; the only data written is a
+test string into synthetic sections and pipes. No pipe client is impersonated.
 """
 import os
 import sys
@@ -471,6 +473,328 @@ def pipe_open(name):
     return {"read": open_only(rf"\\.\pipe\{name}", 0x80000000), "write": open_only(rf"\\.\pipe\{name}", 0x40000000)}
 
 
+# ---------------------------------------------------------------- named objects and pipes (2026-11-26, N0-N4, Q1-Q3)
+# Only synthetic names (iso-nq-...) are used. No pipe client is impersonated.
+DW, BOOL, LPCW, VP = wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR, ctypes.c_void_p
+for _n, _res, _args in (
+        ("CreateEventW", HANDLE, [VP, BOOL, BOOL, LPCW]), ("CreateMutexW", HANDLE, [VP, BOOL, LPCW]),
+        ("CreateSemaphoreW", HANDLE, [VP, wintypes.LONG, wintypes.LONG, LPCW]),
+        ("CreateFileMappingW", HANDLE, [HANDLE, VP, DW, DW, DW, LPCW]),
+        ("OpenEventW", HANDLE, [DW, BOOL, LPCW]), ("OpenMutexW", HANDLE, [DW, BOOL, LPCW]),
+        ("OpenSemaphoreW", HANDLE, [DW, BOOL, LPCW]), ("OpenFileMappingW", HANDLE, [DW, BOOL, LPCW]),
+        ("MapViewOfFile", VP, [HANDLE, DW, DW, DW, ctypes.c_size_t]), ("UnmapViewOfFile", BOOL, [VP]),
+        ("WaitForSingleObject", DW, [HANDLE, DW]), ("SetEvent", BOOL, [HANDLE]), ("ReleaseMutex", BOOL, [HANDLE]),
+        ("ReleaseSemaphore", BOOL, [HANDLE, wintypes.LONG, VP]),
+        ("CreateNamedPipeW", HANDLE, [LPCW, DW, DW, DW, DW, DW, DW, VP]), ("ConnectNamedPipe", BOOL, [HANDLE, VP]),
+        ("DisconnectNamedPipe", BOOL, [HANDLE]), ("SetNamedPipeHandleState", BOOL, [HANDLE, ctypes.POINTER(DW), VP, VP]),
+        ("ReadFile", BOOL, [HANDLE, VP, DW, ctypes.POINTER(DW), VP]),
+        ("WriteFile", BOOL, [HANDLE, VP, DW, ctypes.POINTER(DW), VP]),
+        ("ProcessIdToSessionId", BOOL, [DW, ctypes.POINTER(DW)])):
+    getattr(k32, _n).restype = _res
+    getattr(k32, _n).argtypes = _args
+adv.GetSecurityInfo.restype = DW
+adv.GetSecurityInfo.argtypes = [HANDLE, ctypes.c_int, DW, ctypes.POINTER(VP), ctypes.POINTER(VP), ctypes.POINTER(VP),
+                                ctypes.POINTER(VP), ctypes.POINTER(VP)]
+adv.ConvertSecurityDescriptorToStringSecurityDescriptorW.argtypes = [VP, DW, DW, ctypes.POINTER(wintypes.LPWSTR), VP]
+ntdll.NtQueryObject.argtypes = [HANDLE, ctypes.c_int, VP, wintypes.ULONG, ctypes.POINTER(wintypes.ULONG)]
+ntdll.NtOpenDirectoryObject.argtypes = [ctypes.POINTER(HANDLE), DW, VP]
+ntdll.NtClose.argtypes = [HANDLE]
+
+SYNC, WRITE_DAC_R, READ_CONTROL_R = 0x100000, 0x40000, 0x20000
+OPENERS = {"event": "OpenEventW", "mutex": "OpenMutexW", "semaphore": "OpenSemaphoreW", "section": "OpenFileMappingW"}
+# read-type and write-type rights per object type. The mutex type has no write-type specific right.
+NOBJ_RIGHTS = {"event": {"read": SYNC, "write": 0x2}, "mutex": {"read": SYNC},
+               "semaphore": {"read": SYNC, "write": 0x2}, "section": {"read": 0x4, "write": 0x2}}
+KEEP = []  # handles kept open until the process exits (N3, Q2)
+
+
+def kobj_sddl(h):
+    """Owner, DACL and label of an object through a handle that has READ_CONTROL."""
+    psd = VP()
+    rc = adv.GetSecurityInfo(h, 6, 0x1 | 0x4 | 0x10, None, None, None, None, ctypes.byref(psd))
+    if rc != 0:
+        return f"error:{rc}"
+    s = wintypes.LPWSTR()
+    ok = adv.ConvertSecurityDescriptorToStringSecurityDescriptorW(psd, 1, 0x1 | 0x4 | 0x10, ctypes.byref(s), None)
+    v = s.value if ok else err()
+    if ok:
+        k32.LocalFree(s)
+    k32.LocalFree(psd)
+    return v
+
+
+def nt_name(h):
+    buf = ctypes.create_string_buffer(2048)
+    ret = wintypes.ULONG()
+    st = ntdll.NtQueryObject(h, 1, buf, 2048, ctypes.byref(ret))  # ObjectNameInformation
+    if st:
+        return f"ntstatus:0x{st & 0xffffffff:08x}"
+    length = ctypes.c_uint16.from_buffer(buf, 0).value
+    ptr = ctypes.c_void_p.from_buffer(buf, 8).value
+    return ctypes.wstring_at(ptr, length // 2) if ptr else ""
+
+
+def wait0(h):
+    w = k32.WaitForSingleObject(h, 0)
+    return {0: "signaled", 0x80: "abandoned", 0x102: "not_signaled"}.get(w, f"wait:{w}")
+
+
+def section_io(h, write=None, size=64):
+    view = k32.MapViewOfFile(h, 0x2 if write else 0x4, 0, 0, size)
+    if not view:
+        return err()
+    try:
+        if write:
+            data = write.encode()[:size - 1] + b"\0"
+            ctypes.memmove(view, data, len(data))
+            return "written"
+        return ctypes.string_at(view, size).split(b"\0", 1)[0].decode("utf-8", "replace")
+    finally:
+        k32.UnmapViewOfFile(view)
+
+
+def nobj_create(objs, keep=True):
+    out = {}
+    for o in objs:
+        typ, name = o["type"], o["name"]
+        if typ == "event":
+            h = k32.CreateEventW(None, True, bool(o.get("signaled")), name)
+        elif typ == "mutex":
+            h = k32.CreateMutexW(None, False, name)
+        elif typ == "semaphore":
+            h = k32.CreateSemaphoreW(None, 0, 10, name)
+        else:
+            h = k32.CreateFileMappingW(INVALID, None, 0x04, 0, 4096, name)
+        le = ctypes.get_last_error()
+        if not h:
+            out[name] = {"created": f"error:{le}"}
+            continue
+        r = {"created": "existing" if le == 183 else "new", "path": nt_name(h), "sddl": kobj_sddl(h)}
+        if r["created"] == "new" and typ == "section" and o.get("marker"):
+            r["marker"] = section_io(h, write=o["marker"])
+        if r["created"] == "existing":  # N4: is this the object the other side made?
+            if typ == "event":
+                r["state"] = wait0(h)
+            elif typ == "section":
+                r["content"] = section_io(h)
+        if keep:
+            KEEP.append(h)
+        else:
+            k32.CloseHandle(h)
+        out[name] = r
+    return out
+
+
+def nobj_effect(typ, name, marker):
+    fn = getattr(k32, OPENERS[typ])
+    access = {"event": 0x2, "semaphore": 0x2, "mutex": SYNC, "section": 0x6}[typ]
+    h = fn(access, False, name)
+    if not h:
+        return f"not_opened:{ctypes.get_last_error()}"
+    try:
+        if typ == "event":
+            return "set" if k32.SetEvent(h) else err()
+        if typ == "semaphore":
+            return "released" if k32.ReleaseSemaphore(h, 1, None) else err()
+        if typ == "mutex":
+            w = wait0(h)
+            if w in ("signaled", "abandoned"):
+                k32.ReleaseMutex(h)
+                return "acquired_and_released"
+            return w
+        return {"read": section_io(h), "write": section_io(h, write=marker)}
+    finally:
+        k32.CloseHandle(h)
+
+
+def nobj_open(objs, effects=False, marker=""):
+    out = {}
+    for o in objs:
+        typ, name = o["type"], o["name"]
+        fn = getattr(k32, OPENERS[typ])
+        r = {}
+        for label, right in [*NOBJ_RIGHTS[typ].items(), ("write_dac", WRITE_DAC_R), ("read_control", READ_CONTROL_R)]:
+            h = fn(right, False, name)
+            r[label] = "granted" if h else err()
+            if h:
+                k32.CloseHandle(h)
+        if effects:
+            r["effect"] = nobj_effect(typ, name, marker)
+        out[name] = r
+    return out
+
+
+def ns_dirs():
+    """N0: open the named object directories with each right separately (sandbox side)."""
+    sess = DW()
+    k32.ProcessIdToSessionId(os.getpid(), ctypes.byref(sess))
+
+    class US(ctypes.Structure):
+        _fields_ = [("Length", wintypes.USHORT), ("MaximumLength", wintypes.USHORT), ("Buffer", VP)]
+
+    class OA(ctypes.Structure):
+        _fields_ = [("Length", wintypes.ULONG), ("RootDirectory", HANDLE), ("ObjectName", ctypes.POINTER(US)),
+                    ("Attributes", wintypes.ULONG), ("SecurityDescriptor", VP), ("SecurityQualityOfService", VP)]
+    out = {"session": sess.value}
+    rights = {"query": 0x1, "traverse": 0x2, "create_object": 0x4, "create_subdirectory": 0x8, "read_control": READ_CONTROL_R}
+    for label, path in (("global", r"\BaseNamedObjects"), ("global_restricted", r"\BaseNamedObjects\Restricted"),
+                        ("local", rf"\Sessions\{sess.value}\BaseNamedObjects"),
+                        ("local_restricted", rf"\Sessions\{sess.value}\BaseNamedObjects\Restricted")):
+        b = ctypes.create_unicode_buffer(path)
+        us = US(len(path) * 2, len(path) * 2 + 2, ctypes.cast(b, VP))
+        r = {}
+        for rn, right in rights.items():
+            oa = OA(ctypes.sizeof(OA), None, ctypes.pointer(us), 0x40, None, None)
+            h = HANDLE()
+            st = ntdll.NtOpenDirectoryObject(ctypes.byref(h), right, ctypes.byref(oa))
+            r[rn] = "granted" if st == 0 else f"ntstatus:0x{st & 0xffffffff:08x}"
+            if st == 0:
+                if rn == "read_control":
+                    r["sddl"] = kobj_sddl(h)
+                ntdll.NtClose(h)
+        out[label] = r
+    return out
+
+
+PIPE_ACCESS = {"duplex": 0x3, "inbound": 0x1}
+
+
+def pipe_steps():
+    """Q1: the calls multiprocessing.connection.Pipe makes on Windows, one step at a time."""
+    import uuid
+    out = {}
+    for kind, duplex in (("duplex", True), ("inbound", False)):
+        name = rf"\\.\pipe\iso-nq-q1-{uuid.uuid4().hex[:10]}"
+        h1 = k32.CreateNamedPipeW(name, PIPE_ACCESS[kind] | 0x40000000 | 0x00080000,  # OVERLAPPED | FIRST_PIPE_INSTANCE
+                                  0x4 | 0x2, 1, 8192 if duplex else 0, 8192, 0xFFFFFFFF, None)
+        r = {"server": "created" if h1 != INVALID else err()}
+        if h1 != INVALID:
+            r["server_sddl"] = kobj_sddl(h1)
+            h2 = k32.CreateFileW(name, 0xC0000000 if duplex else 0x40000000, 0, None, 3, 0x40000000, None)
+            r["client"] = "opened" if h2 != INVALID else err()
+            if h2 != INVALID:
+                mode = DW(2)  # PIPE_READMODE_MESSAGE
+                r["set_state"] = "ok" if k32.SetNamedPipeHandleState(h2, ctypes.byref(mode), None, None) else err()
+                k32.CloseHandle(h2)
+            k32.CloseHandle(h1)
+        out[kind] = r
+    # server without the first-instance flag, then one client open per access right
+    clients = {}
+    for label, access in (("read", 0x80000000), ("write", 0x40000000), ("read_write", 0xC0000000),
+                          ("read_control", READ_CONTROL_R)):
+        name = rf"\\.\pipe\iso-nq-q1-{uuid.uuid4().hex[:10]}"
+        h1 = k32.CreateNamedPipeW(name, 0x3, 0x0, 255, 4096, 4096, 0, None)
+        if h1 == INVALID:
+            clients[label] = f"server_{err()}"
+            continue
+        h2 = k32.CreateFileW(name, access, 0, None, 3, 0, None)
+        clients[label] = "opened" if h2 != INVALID else err()
+        if h2 != INVALID:
+            k32.CloseHandle(h2)
+        k32.CloseHandle(h1)
+    out["plain_server_clients"] = clients
+    from multiprocessing.connection import Pipe
+    for d in (True, False):
+        try:
+            a, b = Pipe(duplex=d)
+            a.close()
+            b.close()
+            out[f"mp_pipe_duplex_{d}"] = "ok"
+        except Exception as e:
+            out[f"mp_pipe_duplex_{d}"] = f"error:{type(e).__name__}:{getattr(e, 'winerror', '')}"
+    return out
+
+
+def pipe_try_create(name, first, keep=False, instances=255):
+    flags = 0x3 | (0x00080000 if first else 0)
+    h = k32.CreateNamedPipeW(rf"\\.\pipe\{name}", flags, 0x0, instances, 4096, 4096, 0, None)
+    if h == INVALID:
+        return {"created": err()}, None
+    r = {"created": "yes", "sddl": kobj_sddl(h)}
+    if not keep:
+        k32.CloseHandle(h)
+        return r, None
+    return r, h
+
+
+def pipe_serve(name, instances, log):
+    """Q2: pipe server kept for the life of the process. Each connection and up to 256 bytes received are logged."""
+    import threading
+    out = {"instances": []}
+    for i in range(instances):
+        r, h = pipe_try_create(name, first=(i == 0), keep=True)
+        out["instances"].append(r["created"])
+        if i == 0:
+            out["sddl"] = r.get("sddl")
+        if h is None:
+            continue
+        KEEP.append(h)
+
+        def serve(h=h, i=i):
+            while True:
+                ok = k32.ConnectNamedPipe(h, None)
+                if not ok and ctypes.get_last_error() != 535:  # ERROR_PIPE_CONNECTED
+                    time.sleep(0.2)
+                    continue
+                buf = ctypes.create_string_buffer(256)
+                n = DW()
+                got = k32.ReadFile(h, buf, 255, ctypes.byref(n), None)
+                data = buf.raw[:n.value].decode("utf-8", "replace") if got else f"read_error:{ctypes.get_last_error()}"
+                try:
+                    with open(log, "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"instance": i, "time": time.time(), "data": data}) + "\n")
+                except OSError:
+                    pass
+                k32.DisconnectNamedPipe(h)
+        threading.Thread(target=serve, daemon=True).start()
+    return out
+
+
+def pipe_connect(path, access, wait=3.0):
+    """CreateFile on a pipe, retrying while every server instance is busy (ERROR_PIPE_BUSY 231). A server
+    that may create only one instance needs a moment to reconnect after the previous client."""
+    t0 = time.time()
+    while True:
+        h = k32.CreateFileW(path, access, 0, None, 3, 0, None)
+        if h != INVALID:
+            return h, "opened"
+        e = ctypes.get_last_error()
+        if e != 231 or time.time() - t0 > wait:
+            return None, f"error:{e}"
+        time.sleep(0.05)
+
+
+def pipe_client(name, data):
+    """Q2: connect to a pipe with each right; the write connection sends `data`."""
+    path = rf"\\.\pipe\{name}"
+    out = {}
+    h, out["read"] = pipe_connect(path, 0x80000000)
+    if h:
+        k32.CloseHandle(h)
+    h, out["write"] = pipe_connect(path, 0x40000000)
+    if h:
+        b = data.encode()
+        n = DW()
+        out["write_data"] = "sent" if k32.WriteFile(h, b, len(b), ctypes.byref(n), None) else err()
+        k32.CloseHandle(h)
+    h, out["read_control"] = pipe_connect(path, READ_CONTROL_R)
+    if h:
+        out["sddl"] = kobj_sddl(h)
+        k32.CloseHandle(h)
+    return out
+
+
+def hold(seconds, hb, stop):
+    end = time.time() + float(seconds)
+    while time.time() < end and not Path(stop).exists():
+        try:
+            Path(hb).write_text(f"{os.getpid()} {time.time()}\n")
+        except OSError:
+            pass
+        time.sleep(0.5)
+    return "stopped" if Path(stop).exists() else "timeout"
+
+
 # ---------------------------------------------------------------- dispatcher
 def run_task(t):
     kind = t["kind"]
@@ -516,6 +840,20 @@ def run_task(t):
     if kind == "wait":
         time.sleep(t["seconds"])
         return "waited"
+    if kind == "nsdir":
+        return ns_dirs()
+    if kind == "nobj_open":
+        return nobj_open(t["objects"], t.get("effects", False), t.get("marker", ""))
+    if kind == "nobj_create":
+        return nobj_create(t["objects"], keep=t.get("keep", True))
+    if kind == "pipe_steps":
+        return pipe_steps()
+    if kind == "pipe_serve":
+        return pipe_serve(t["name"], t.get("instances", 4), expand(t["log"]))
+    if kind == "pipe_client":
+        return pipe_client(t["name"], t["data"])
+    if kind == "hold":
+        return hold(t["seconds"], expand(t["heartbeat"]), expand(t["stop"]))
     return f"unknown_kind:{kind}"
 
 
@@ -529,6 +867,13 @@ def main():
     spec = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     out = {}
     for t in spec["tasks"]:
+        if t["kind"] == "checkpoint":  # results so far, for a harness that acts while this process keeps running
+            try:
+                Path(expand(t["path"])).write_text(json.dumps(out), encoding="utf-8")
+                out[t["id"]] = "written"
+            except OSError as e:
+                out[t["id"]] = f"error:{e}"
+            continue
         try:
             out[t["id"]] = run_task(t)
         except Exception as e:  # keep going; record the failure

@@ -1,6 +1,6 @@
 # Windows에서 코딩 에이전트는 어디까지 격리되나
 
-Windows에서 직접 실행하는 에이전트 7종을 공식 문서와 릴리스 소스로 조사했습니다. 그중 Restricted Token을 쓰는 네 구성과 QwenPaw의 AppContainer를 실제 PC에서 측정했습니다. MXC BaseContainer는 실측하지 않고, 사용할 수 있는 장치와 그 비율만 정리했습니다. 프로젝트는 2026-11-25에 종료했습니다. [서비스별 조사 범위와 버전](README.md#windows-서비스별-조사) · [질문별 결과와 근거](findings.md)
+Windows에서 직접 실행하는 에이전트 7종을 공식 문서와 릴리스 소스로 조사했습니다. 그중 Restricted Token을 쓰는 네 구성과 QwenPaw의 AppContainer를 실제 PC에서 측정했습니다. MXC BaseContainer는 실측하지 않고, 사용할 수 있는 장치와 그 비율만 정리했습니다. 프로젝트는 2026-11-25에 종료했고, 2026-11-26에 이름 있는 객체와 명명된 파이프를 추가로 측정했습니다. [서비스별 조사 범위와 버전](README.md#windows-서비스별-조사) · [질문별 결과와 근거](findings.md)
 
 ## 핵심 결론
 
@@ -27,8 +27,10 @@ Windows에서 직접 실행하는 에이전트 7종을 공식 문서와 릴리�
 - **작업 폴더 안 보호.** QwenPaw 두 구성은 `.git`과 읽기 전용 폴더의 변경을 허용했습니다. Codex 두 구성은 시작 전에 있던 `.git`·`.codex`·`.agents`는 보호했지만, 시작 시점에 없던 같은 이름의 폴더는 만들 수 있었습니다.
 - **작업 폴더 사이.** QwenPaw 비관리자와 Codex 두 구성은 동시에 실행 중인 다른 작업 폴더의 샌드박스 프로세스를 모든 권한으로 열었습니다. Codex 두 구성은 임시 폴더를 작업 폴더끼리 같이 씁니다. Codex `elevated`는 샌드박스 계정 프로필도 같이 씁니다.
 - **남는 프로세스.** Codex 두 구성에서는 Job 밖으로 띄운 프로세스가 제품을 강제 종료한 뒤에도 실행됐습니다.
+- **이름 있는 객체(2026-11-26).** QwenPaw 비관리자와 Codex 두 구성은 호스트 프로그램이 `Local\`에 만든 이벤트·뮤텍스·세마포어·공유 메모리를 열어 읽고 썼습니다. 샌드박스가 먼저 만든 이름으로 호스트가 객체를 만들면 샌드박스의 객체와 내용을 그대로 받았습니다. `Local\` 객체는 사용자 로그온 SID의 모든 권한 ACE를 상속하기 때문입니다. [실행 기록](runs/2026-11-26-01.md)
+- **명명된 파이프(2026-11-26).** 현재 사용자 토큰을 쓰는 두 구성에서는 호스트가 샌드박스가 만든 파이프에 데이터를 보냈고, 같은 이름에 서버 인스턴스를 추가할 수 있었습니다. Codex `elevated`에서는 다른 작업 폴더의 샌드박스가 그 파이프에 데이터를 보냈습니다.
 
-QwenPaw 관리자만 사용자 프로세스와 다른 작업 폴더의 샌드박스를 열지 못했고, 사용자 로그온 SID에 쓰기를 준 위치에도 쓰지 못했습니다.
+QwenPaw 관리자만 사용자 프로세스와 다른 작업 폴더의 샌드박스를 열지 못했고, 사용자 로그온 SID에 쓰기를 준 위치에도 쓰지 못했습니다. 이름 있는 객체도 열지 못했지만, 이 샌드박스 안에서는 이름 있는 객체를 만드는 호출 자체가 실패했습니다.
 
 ### 왜 그런가
 
@@ -139,6 +141,8 @@ Codex `0.171.0`의 해당 경로는 **① 권한 확대 요청 심사 → ② �
 
 - **병렬 빌드와 디버깅.** 이전 Codex MXC 버전에서 단일 작업자 빌드는 성공했지만 병렬 MSBuild와 진단 연결이 실패했다는 공개 보고가 있습니다. 프로세스 간 통신에 쓰는 명명된 파이프가 관련된 것으로 보고됐으며, 원인과 조사 기준 버전인 `0.171.0`에서의 재현 여부는 확인되지 않았습니다. [MSBuild 병렬 실행 구조](https://learn.microsoft.com/en-us/visualstudio/msbuild/build-process-overview) · [공개 호환성 보고](https://github.com/openai/codex/issues/60794)
 - **실측한 병렬 작업.** Python 다중 프로세스 병렬 작업은 QwenPaw 비관리자 Restricted Token, QwenPaw AppContainer, Codex `unelevated`에서 `WinError 5`로 실패했습니다. Codex `elevated`와 QwenPaw 관리자에서는 성공했습니다(각 5/5). [실행 기록](runs/2026-11-25-01.md#9-환경-변수-데스크톱-병렬-빌드-e-f-g4)
+  - Restricted Token 두 구성의 원인은 2026-11-26에 확인했습니다. 파이프 서버는 만들어지고, 같은 프로세스가 그 파이프를 쓰기 권한으로 여는 단계에서 거부됩니다.
+  - 보안 설명자 없이 만든 파이프는 소유자(사용자 SID)에게만 쓰기를 주는데, 두 구성의 제한 SID 목록에 사용자 SID가 없기 때문입니다. 성공한 두 구성은 소유자가 샌드박스 계정이고 그 SID가 제한 SID 목록에 있습니다. [실행 기록](runs/2026-11-26-01.md#q1-병렬-빌드-실패-단계)
 - **개발 서버와 파일 변경 감시.** Codex MXC는 전경 명령이 끝나면 남은 자식 프로세스도 종료합니다. 셸 명령이 반환된 뒤에도 서버나 워처가 계속 살아 있어야 하는 작업은 이 동작의 영향을 받습니다. [Codex Windows 샌드박스](https://learn.chatgpt.com/docs/windows/windows-sandbox#mxc-compatibility)
 - **Windows 앱과 사용자별 설정.** 창 조작, 입력, 클립보드에는 각각 별도 권한이 필요합니다. AppContainer나 별도 계정에서 실행하면 기존 Windows 사용자 프로필의 레지스트리 설정이나 로그인 상태를 읽는 도구도 따로 확인해야 합니다. [MXC UI 정책](https://github.com/microsoft/mxc/blob/main/docs/backends/process-container/UIPolicy_Schema.md) · [Microsoft AppContainer 격리](https://learn.microsoft.com/en-us/windows/win32/secauthz/appcontainer-isolation)
 
@@ -179,6 +183,7 @@ OpenClaw Hub V2가 새 승인에 저장하는 단위는 실행 파일과 인수�
 | Windows 호스트 기준 | 공통 워크로드 5회 | [실행 기록](runs/2026-11-23-01.md) |
 | QwenPaw 비관리자 Restricted Token, AppContainer | ISO-01~18 | [QwenPaw 실측 보고서](report-qwenpaw-backends.md) |
 | Restricted Token 네 구성(QwenPaw 비관리자·관리자, Codex `unelevated`·`elevated`) | 파일, 레지스트리, 다른 프로세스, 환경 변수, 데스크톱, 프로세스 수명, 시간, 남는 항목 | [사례별 보고서](report-token-backends/index.html) · [결과 및 판단](findings.md#restricted-token-네-구성-실측-2026-11-25) |
+| 같은 네 구성의 이름 있는 객체와 명명된 파이프 | 2026-11-26 추가 실측. 가장은 제외 | [결과 및 판단](findings.md#이름-있는-객체와-명명된-파이프-실측-2026-11-26) · [실행 기록](runs/2026-11-26-01.md) |
 | MXC BaseContainer | 실측하지 않기로 함. 사용할 수 있는 장치와 비율만 정리 | [MXC 사용 가능 장치](research/solutions/mxc.md#사용할-수-있는-장치와-비율) |
 | OpenClaw, Codex 승인 흐름 | 미측정 | [후속 과제](findings.md#후속-과제) |
 
