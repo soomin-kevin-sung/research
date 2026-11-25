@@ -12,9 +12,9 @@ Windows 네이티브 비교 범위를 확정하기 전의 자료입니다. 에�
 
 | 에이전트 | 제품 실행 경로 | 배포·호스팅 경로 |
 | --- | --- | --- |
-| [Codex](agents/codex.md) | 네이티브 [MXC](../../research/solutions/mxc.md), 레거시 [전용 계정·제한 토큰](../../research/solutions/windows-accounts-tokens.md), Linux [Bubblewrap](solutions/bubblewrap.md)과 제한적인 레거시 [Landlock](solutions/landlock.md) | [WSL2](solutions/wsl2.md), [Dev Containers](solutions/dev-containers.md), [Codex Cloud](solutions/codex-cloud.md) |
+| [Codex](agents/codex.md) | 네이티브 [MXC](../../research/solutions/mxc.md), 레거시 [전용 계정·Restricted Token](../../research/solutions/windows-accounts-tokens.md), Linux [Bubblewrap](solutions/bubblewrap.md)과 제한적인 레거시 [Landlock](solutions/landlock.md) | [WSL2](solutions/wsl2.md), [Dev Containers](solutions/dev-containers.md), [Codex Cloud](solutions/codex-cloud.md) |
 | [Claude Code](agents/claude-code.md) | Windows [도구 승인과 호스트 셸](../../research/solutions/tool-approval.md), WSL2 [Bubblewrap과 네트워크 프록시](solutions/bubblewrap.md) | [WSL2](solutions/wsl2.md), [Docker](solutions/docker.md), [Dev Containers](solutions/dev-containers.md), [VM](solutions/virtual-machines.md), [관리형 클라우드](solutions/claude-code-cloud.md) |
-| [QwenPaw](agents/qwenpaw.md) | 거버넌스 판정 후 [AppContainer](../../research/solutions/appcontainer.md) 또는 [제한 토큰·WFP](../../research/solutions/windows-accounts-tokens.md). Linux는 [Bubblewrap](solutions/bubblewrap.md) 또는 [Landlock](solutions/landlock.md) 탐지 | Linux판을 [WSL2](solutions/wsl2.md)에 설치하는 경우 |
+| [QwenPaw](agents/qwenpaw.md) | 거버넌스 판정 후 [AppContainer](../../research/solutions/appcontainer.md) 또는 [Restricted Token·WFP](../../research/solutions/windows-accounts-tokens.md). Linux는 [Bubblewrap](solutions/bubblewrap.md) 또는 [Landlock](solutions/landlock.md) 탐지 | Linux판을 [WSL2](solutions/wsl2.md)에 설치하는 경우 |
 | [OpenClaw](agents/openclaw.md) | Gateway [호스트 실행](../../research/solutions/tool-approval.md), [Docker](solutions/docker.md), [Podman](solutions/podman.md), [MXC 플러그인](../../research/solutions/mxc.md), [SSH](solutions/ssh.md), [OpenShell](solutions/openshell.md), [Crabbox](solutions/crabbox.md)를 통한 [Daytona](solutions/daytona.md). Windows Hub 노드는 별도 [MXC](../../research/solutions/mxc.md) | 관리형 Gateway의 [WSL2](solutions/wsl2.md) 또는 Store 네이티브 [MXC IsolationSession](../../research/solutions/mxc-isolation-session.md) |
 | [Hermes Agent](agents/hermes.md) | 기본 [호스트 셸](../../research/solutions/tool-approval.md), [Docker](solutions/docker.md) 또는 호환 [Podman](solutions/podman.md), [SSH](solutions/ssh.md), [Modal](solutions/modal.md), [Daytona](solutions/daytona.md), [Vercel Sandbox](solutions/vercel-sandbox.md) | [WSL2](solutions/wsl2.md) 직접 설치 또는 WSL 터미널 연결 |
 | [OpenCode](agents/opencode.md) | [도구 승인과 호스트 셸](../../research/solutions/tool-approval.md) | [WSL2](solutions/wsl2.md), 외부 [컨테이너](solutions/docker.md), [VM](solutions/virtual-machines.md) 또는 별도 원격 서버에 엔진 배치 |
@@ -26,7 +26,7 @@ Windows 네이티브 비교 범위를 확정하기 전의 자료입니다. 에�
 | --- | --- |
 | [MXC](../../research/solutions/mxc.md) | Windows ProcessContainer에서 실행한 프로세스에 SDK 정책 적용 |
 | [MXC IsolationSession](../../research/solutions/mxc-isolation-session.md) | 전용 Windows 계정과 OS 관리 세션에 Gateway 서비스 배치 |
-| [Windows 전용 계정·제한 토큰·ACL·WFP](../../research/solutions/windows-accounts-tokens.md) | Windows 보안 주체와 객체 접근 권한, 네트워크 필터 |
+| [Windows 전용 계정·Restricted Token·ACL·WFP](../../research/solutions/windows-accounts-tokens.md) | Windows 보안 주체와 객체 접근 권한, 네트워크 필터 |
 | [AppContainer](../../research/solutions/appcontainer.md) | Windows AppContainer SID, capability, 객체 ACL |
 | [Bubblewrap](solutions/bubblewrap.md) | Linux 네임스페이스와 호출자가 조립한 마운트·네트워크 정책 |
 | [Landlock](solutions/landlock.md) | Linux 커널의 접근 제어 규칙 |

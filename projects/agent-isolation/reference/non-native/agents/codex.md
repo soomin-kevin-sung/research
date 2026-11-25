@@ -4,7 +4,7 @@
 
 [조사 목록](../README.md)
 
-관련 기술은 [MXC](../../../research/solutions/mxc.md) · [전용 계정·제한 토큰·ACL·WFP](../../../research/solutions/windows-accounts-tokens.md) · [Bubblewrap](../solutions/bubblewrap.md) · [Landlock](../solutions/landlock.md) · [WSL2](../solutions/wsl2.md) · [Dev Containers](../solutions/dev-containers.md) · [Codex Cloud](../solutions/codex-cloud.md)에서 설명합니다.
+관련 기술은 [MXC](../../../research/solutions/mxc.md) · [전용 계정·Restricted Token·ACL·WFP](../../../research/solutions/windows-accounts-tokens.md) · [Bubblewrap](../solutions/bubblewrap.md) · [Landlock](../solutions/landlock.md) · [WSL2](../solutions/wsl2.md) · [Dev Containers](../solutions/dev-containers.md) · [Codex Cloud](../solutions/codex-cloud.md)에서 설명합니다.
 
 ## 네이티브 실행과 백엔드 선택
 
@@ -14,7 +14,7 @@ Codex는 Windows에서 PowerShell 명령과 자식 프로세스를 네이티브 
 | --- | --- | --- |
 | `mxc` | Microsoft Execution Containers의 `BaseContainerRunner`와 Windows PSEC. 호환성은 OS 버전명보다 런타임 프로브로 확인 | 경로별 쓰기·읽기·거부 정책과 네트워크 정책 적용. 별도 샌드박스 계정이나 로컬 방화벽 규칙 없이 실행 |
 | `elevated` | 관리자 승인으로 별도 샌드박스 계정과 ACL 등을 준비. 명령은 해당 비관리자 계정에서 실행 | ACL과 계정 경계로 파일 접근을 제어. 오프라인 샌드박스 사용자에 대한 방화벽 규칙으로 네트워크 차단 |
-| `unelevated` | 현재 사용자에서 파생한 제한 토큰과 ACL. 관리자 사전 준비가 어려운 환경의 레거시 대체 경로 | 파일 경계는 적용하지만 읽기 거부 경로를 지원하지 않음. 오프라인 정책은 환경 변수에 의존하여 네트워크 격리가 약함 |
+| `unelevated` | 현재 사용자에서 파생한 Restricted Token과 ACL. 관리자 사전 준비가 어려운 환경의 레거시 대체 경로 | 파일 경계는 적용하지만 읽기 거부 경로를 지원하지 않음. 오프라인 정책은 환경 변수에 의존하여 네트워크 격리가 약함 |
 
 MXC 구현은 Windows PSEC의 BaseContainer 경로를 사용합니다. 두 레거시 백엔드는 기본적으로 별도 데스크톱도 사용합니다. 관리 설정의 `windows.allow_mxc`는 MXC 선택을 제어하고, `windows.allowed_sandbox_implementations`는 허용할 레거시 백엔드를 제어합니다. Windows 11은 권장 기준이며, MXC 사용 가능 여부는 대상 PC에서 별도로 확인해야 합니다. [Windows 샌드박스](https://learn.chatgpt.com/docs/windows/windows-sandbox) · [레거시 Windows 구현](https://github.com/openai/codex/tree/rust-v0.171.0/codex-rs/windows-sandbox-rs)
 

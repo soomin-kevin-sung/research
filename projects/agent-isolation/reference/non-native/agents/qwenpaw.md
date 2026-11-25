@@ -4,7 +4,7 @@
 
 [조사 목록](../README.md)
 
-관련 기술은 [AppContainer](../../../research/solutions/appcontainer.md) · [전용 계정·제한 토큰·ACL·WFP](../../../research/solutions/windows-accounts-tokens.md) · [Bubblewrap](../solutions/bubblewrap.md) · [Landlock](../solutions/landlock.md) · [WSL2](../solutions/wsl2.md)에서 설명합니다.
+관련 기술은 [AppContainer](../../../research/solutions/appcontainer.md) · [전용 계정·Restricted Token·ACL·WFP](../../../research/solutions/windows-accounts-tokens.md) · [Bubblewrap](../solutions/bubblewrap.md) · [Landlock](../solutions/landlock.md) · [WSL2](../solutions/wsl2.md)에서 설명합니다.
 
 ## 거버넌스와 실제 실행 경로
 

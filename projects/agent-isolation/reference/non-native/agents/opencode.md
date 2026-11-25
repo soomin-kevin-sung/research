@@ -8,7 +8,7 @@
 
 ## 로컬 셸 실행 방식
 
-안정 태그의 Windows 셸 도구는 네이티브 자식 프로세스를 실행합니다. PowerShell은 `-NoProfile`, `-NonInteractive`, `-Command` 인자로 호출하고, 다른 셸도 해당 호스트에서 실행합니다. 이 코드 경로에서는 AppContainer, MXC, 제한 토큰, 컨테이너와 같은 OS 격리를 추가하지 않습니다. 셸의 작업 디렉터리와 타임아웃을 지정할 수 있으며, 환경은 호스트의 `process.env`에 플러그인의 `shell.env` 값을 합칩니다. [안정 태그 셸 구현](https://github.com/anomalyco/opencode/blob/v1.19.6/packages/opencode/src/tool/shell.ts)
+안정 태그의 Windows 셸 도구는 네이티브 자식 프로세스를 실행합니다. PowerShell은 `-NoProfile`, `-NonInteractive`, `-Command` 인자로 호출하고, 다른 셸도 해당 호스트에서 실행합니다. 이 코드 경로에서는 AppContainer, MXC, Restricted Token, 컨테이너와 같은 OS 격리를 추가하지 않습니다. 셸의 작업 디렉터리와 타임아웃을 지정할 수 있으며, 환경은 호스트의 `process.env`에 플러그인의 `shell.env` 값을 합칩니다. [안정 태그 셸 구현](https://github.com/anomalyco/opencode/blob/v1.19.6/packages/opencode/src/tool/shell.ts)
 
 ## V1과 V2의 승인 규칙
 
