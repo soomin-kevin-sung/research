@@ -1,6 +1,6 @@
 # Windows에서 코딩 에이전트는 어디까지 격리되나
 
-Windows에서 직접 실행하는 에이전트 7종을 공식 문서와 릴리스 소스로 조사했습니다. 그중 Restricted Token을 쓰는 네 구성과 QwenPaw의 AppContainer를 실제 PC에서 측정했습니다. MXC BaseContainer는 측정하지 않았습니다. 프로젝트는 2026-11-25에 종료했습니다. [서비스별 조사 범위와 버전](README.md#windows-서비스별-조사) · [질문별 결과와 근거](findings.md)
+Windows에서 직접 실행하는 에이전트 7종을 공식 문서와 릴리스 소스로 조사했습니다. 그중 Restricted Token을 쓰는 네 구성과 QwenPaw의 AppContainer를 실제 PC에서 측정했습니다. MXC BaseContainer는 실측하지 않고, 사용할 수 있는 장치와 그 비율만 정리했습니다. 프로젝트는 2026-11-25에 종료했습니다. [서비스별 조사 범위와 버전](README.md#windows-서비스별-조사) · [질문별 결과와 근거](findings.md)
 
 ## 핵심 결론
 
@@ -52,9 +52,19 @@ QwenPaw 관리자만 사용자 프로세스와 다른 작업 폴더의 샌드박
 - **QwenPaw AppContainer.** 작업 폴더 밖 읽기·쓰기, 외부 네트워크, 호스트의 명명된 파이프를 Windows가 거부했습니다. 그러나 작업 폴더 안 하위 폴더 보호가 실패했고, 개발 도구 호환성이 낮으며, 에이전트 경로에서는 선택되지 않습니다. [QwenPaw 실측 보고서](report-qwenpaw-backends.md)
 - **QwenPaw의 승인 경로.** 기본 설정은 셸에 샌드박스를 적용하지 않습니다. 샌드박스가 막은 명령을 사용자가 승인하면 같은 명령이 격리 없이 다시 실행됐습니다(5/5). [승인 흐름 실측](runs/2026-11-24-07.md#1-iso-1518-승인-흐름-통합-시나리오마다-5회)
 
+### MXC를 쓸 수 있는 장치
+
+MXC는 실측하지 않았습니다. 대신 쓸 수 있는 장치의 범위와 비율을 공식 문서와 통계로 정리했습니다.
+
+- **Windows 11 24H2·25H2에 2026년 9월 이후 업데이트를 설치한 장치부터 지원합니다.** 정확한 최소 빌드는 26100.9278·26200.9278(2026-08-27 업데이트)입니다. 26H2와 새 장치용 26H1도 지원합니다. Windows 10과 Windows Server는 지원 목록에 없습니다.
+- **Windows 데스크톱 사용자 중 최대 약 74%(한국 약 66%)가 후보입니다.** StatCounter 2026년 10월의 Windows 11 비율이라 상한입니다.
+- **실제 비율은 이보다 낮습니다.** 23H2 이하이거나 업데이트가 밀린 Windows 11과, 빌드를 만족해도 기능이 아직 배포되지 않은 장치가 빠집니다. 기능 버전별 공개 통계가 없어 얼마나 낮은지는 정할 수 없습니다.
+
+[지원 빌드와 비율의 근거](research/solutions/mxc.md#사용할-수-있는-장치와-비율)
+
 ### 측정하지 않은 것
 
-- MXC BaseContainer. 아래 MXC 관련 내용은 모두 문서와 소스 기준입니다.
+- MXC BaseContainer. 실측하지 않기로 했습니다. 아래 MXC 관련 내용은 모두 문서와 소스 기준입니다.
 - 네 구성의 네트워크 차단과 클립보드.
 - Codex와 OpenClaw의 승인 흐름.
 - 열린 핸들로 하는 실제 조작(메모리 읽기, 가장, 종료).
@@ -169,6 +179,7 @@ OpenClaw Hub V2가 새 승인에 저장하는 단위는 실행 파일과 인수�
 | Windows 호스트 기준 | 공통 워크로드 5회 | [실행 기록](runs/2026-11-23-01.md) |
 | QwenPaw 비관리자 Restricted Token, AppContainer | ISO-01~18 | [QwenPaw 실측 보고서](report-qwenpaw-backends.md) |
 | Restricted Token 네 구성(QwenPaw 비관리자·관리자, Codex `unelevated`·`elevated`) | 파일, 레지스트리, 다른 프로세스, 환경 변수, 데스크톱, 프로세스 수명, 시간, 남는 항목 | [사례별 보고서](report-token-backends/index.html) · [결과 및 판단](findings.md#restricted-token-네-구성-실측-2026-11-25) |
-| MXC BaseContainer, OpenClaw, Codex 승인 흐름 | 미측정 | [후속 과제](findings.md#후속-과제) |
+| MXC BaseContainer | 실측하지 않기로 함. 사용할 수 있는 장치와 비율만 정리 | [MXC 사용 가능 장치](research/solutions/mxc.md#사용할-수-있는-장치와-비율) |
+| OpenClaw, Codex 승인 흐름 | 미측정 | [후속 과제](findings.md#후속-과제) |
 
 측정에는 합성 파일과 통제된 서비스를 사용했습니다. Windows 빌드·실행 계정·실제 백엔드·권한 설정은 실행 기록마다 남겼습니다. [실측 프로토콜](protocol.md) · [측정하지 않은 항목](findings.md#측정하지-않은-항목과-후속-과제)

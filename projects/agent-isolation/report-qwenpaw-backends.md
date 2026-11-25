@@ -225,7 +225,7 @@ Windows의 각 프로세스에는 액세스 토큰(이하 토큰)이 붙습니�
 | Codex `elevated` | 2026-11-25 측정 | [실행 기록](runs/2026-11-25-01.md) · [R3](runs/2026-11-25-03.md) |
 | QwenPaw 관리자 백엔드 | 2026-11-25 측정 | [실행 기록](runs/2026-11-25-02.md) |
 | 네 구성의 명령당 시간 | 2026-11-25 측정. Codex `elevated`의 최초 설치 시간은 미측정 | [결과 및 판단](findings.md#작업-호환성과-시간) |
-| MXC BaseContainer | 미측정. 후속 과제 | [후속 과제](findings.md#후속-과제) |
+| MXC BaseContainer | 실측하지 않기로 함. 사용할 수 있는 장치와 비율만 정리 | [MXC 사용 가능 장치](research/solutions/mxc.md#사용할-수-있는-장치와-비율) |
 
 네 구성의 결론은 [결과 및 판단](findings.md#restricted-token-네-구성-실측-2026-11-25)과 [사례별 보고서](report-token-backends/index.html)에 있습니다.
 

@@ -6,7 +6,7 @@
 - **QwenPaw의 Restricted Token(비관리자)과 AppContainer.** ISO-01~14를 실측했습니다(ISO-13은 클립보드 열기만). ISO-15~18은 제품의 도구 래퍼와 승인 서비스를 직접 호출해 통합 실측했습니다. [QwenPaw 백엔드 실행](runs/2026-11-23-02.md) · [QwenPaw 실측 보고서](report-qwenpaw-backends.md)
 - **Restricted Token 네 구성.** QwenPaw `2.3.0.post1`의 비관리자·관리자와 Codex CLI `0.172.0`의 `unelevated`·`elevated`를 같은 항목으로 실측했습니다. [결과](#restricted-token-네-구성-실측-2026-11-25) · [사례별 보고서](report-token-backends/index.html)
 
-MXC BaseContainer는 측정하지 않았습니다. 네 구성 비교에서는 네트워크 차단과 클립보드도 측정하지 않았습니다. 측정하지 않은 항목은 [측정하지 않은 항목과 후속 과제](#측정하지-않은-항목과-후속-과제)에 모았습니다.
+MXC BaseContainer는 실측하지 않기로 했고, 사용할 수 있는 장치와 그 비율만 문서와 통계로 정리했습니다([MXC 사용 가능 장치](research/solutions/mxc.md#사용할-수-있는-장치와-비율)). 네 구성 비교에서는 네트워크 차단과 클립보드도 측정하지 않았습니다. 측정하지 않은 항목은 [측정하지 않은 항목과 후속 과제](#측정하지-않은-항목과-후속-과제)에 모았습니다.
 
 문헌·소스 조사와 실측을 합친 결론은 [조사 보고서](report.md)에 있습니다.
 
@@ -197,7 +197,7 @@ QwenPaw `2.3.0.post1`의 비관리자(`WindowsUnelevatedSandbox`)와 Codex CLI `
 
 | 항목 | 상태 | 근거 |
 | --- | --- | --- |
-| MXC BaseContainer(Codex, OpenClaw) | 미측정. 문헌·소스 조사만 있음 | [MXC 조사](research/solutions/mxc.md) · [프로토콜의 MXC 항목](protocol.md#mxc-보호-폴더-이름-변경) |
+| MXC BaseContainer(Codex, OpenClaw) | 실측하지 않기로 함(2026-11-25). 문헌·소스 조사와 사용할 수 있는 장치·비율 정리만 있음 | [MXC 조사](research/solutions/mxc.md) · [사용 가능 장치와 비율](research/solutions/mxc.md#사용할-수-있는-장치와-비율) |
 | Codex의 승인 흐름과 권한 확대 뒤 읽기 거부 유지 | 미측정. 언어 모델 세션이 필요하고, 실측 대상은 백엔드였음 | [프로토콜](protocol.md#codex-권한-확대와-읽기-거부-보존) |
 | OpenClaw Windows Hub·Gateway | 미측정. 문헌·소스 조사만 있음 | [OpenClaw 조사](research/agents/openclaw.md) |
 | Claude Code, Hermes Agent, OpenCode, OpenHuman | 제품별 실측 없음. Windows 호스트 계정으로 실행하는 경로라 호스트 기준 동작으로 분류 | [실행 경로](research/README.md#에이전트별-windows-실행-경로) |
@@ -248,8 +248,7 @@ QwenPaw `2.3.0.post1`의 비관리자(`WindowsUnelevatedSandbox`)와 Codex CLI `
 
 ### 후속 과제
 
-1. MXC BaseContainer 실측. 하위 경로 읽기 거부와 시작 시 검사, 보호 폴더 이름 변경, 관리형 프록시와 로컬 연결, 명령 종료 때 자식 정리를 봅니다.
-2. Codex 승인 흐름 실측. 권한 확대를 승인한 뒤에도 읽기 거부가 유지되는지 봅니다.
-3. 네트워크 차단 실측. 별도 계정 방화벽 규칙과 WFP 필터가 프록시를 쓰지 않는 연결을 막는지 봅니다.
-4. 시험용 PC나 가상 머신에서 Codex `elevated`의 최초 설치 시간과 재설치 영향을 측정합니다.
-5. 프로필 루트가 `Users`·`Everyone` 읽기를 상속하지 않는 PC에서 별도 계정 구성의 읽기 범위를 다시 측정합니다.
+1. Codex 승인 흐름 실측. 권한 확대를 승인한 뒤에도 읽기 거부가 유지되는지 봅니다.
+2. 네트워크 차단 실측. 별도 계정 방화벽 규칙과 WFP 필터가 프록시를 쓰지 않는 연결을 막는지 봅니다.
+3. 시험용 PC나 가상 머신에서 Codex `elevated`의 최초 설치 시간과 재설치 영향을 측정합니다.
+4. 프로필 루트가 `Users`·`Everyone` 읽기를 상속하지 않는 PC에서 별도 계정 구성의 읽기 범위를 다시 측정합니다.

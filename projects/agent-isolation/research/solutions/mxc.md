@@ -31,7 +31,55 @@ Windows Hub `2026.11.3`의 노드 `system.run`은 **SDK 준비, BaseContainer �
 
 [지원 판정 코드](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/src/OpenClaw.Shared/Mxc/MxcAvailability.cs#L16-L89) · [실행 경로 코드](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/src/OpenClaw.Shared/Mxc/NodeSandboxExecutor.cs) · [공식 호환 실행 설명](https://github.com/openclaw/openclaw-windows-node/blob/v2026.11.3/docs/OPENCLAW_GATEWAY_NODE_EXEC_FAQ.md#how-does-windows-sandboxing-work-and-is-it-a-gateway-plugin)
 
+## 사용할 수 있는 장치와 비율
+
+2026-11-25에 확인한 공식 문서와 통계입니다. 이 프로젝트에서는 MXC를 실측하지 않기로 했고, 이 절은 MXC를 쓸 수 있는 장치의 범위와 그 비율만 정리합니다.
+
+### 지원 Windows 버전
+
+MXC의 ProcessContainer는 Windows 11에서만 지원됩니다. Codex는 이 백엔드에서 BaseContainerRunner로 명령을 실행합니다. 기능 버전마다 최소 빌드가 다릅니다.
+
+| Windows 11 버전 | ProcessContainer 최소 빌드 | 해당 업데이트 |
+| --- | --- | --- |
+| 24H2 | 26100.9278 | KB5120998(2026-08-27, 선택적 미리 보기 업데이트) |
+| 25H2 | 26200.9278 | KB5120998(2026-08-27, 선택적 미리 보기 업데이트) |
+| 26H2 | 26300.9550 | KB5124010(2026-09-29) |
+| 26H1(새 장치 전용) | 28000.2804 | KB5120996 |
+
+- 24H2·25H2에서 최소 빌드를 포함하는 첫 월간 보안 업데이트는 2026-09-08의 KB5124008(빌드 .9445)입니다. 2026년 9월 이후의 보안 업데이트를 설치한 24H2·25H2 장치는 빌드 조건을 만족합니다.
+- 아키텍처는 x64와 ARM64입니다. ProcessContainer는 사용자 세션 안에서 실행되며 중첩 가상화가 필요 없습니다.
+- Windows 10과 Windows Server는 지원 목록에 없습니다.
+- 에디션(Home·Pro·Enterprise·Education)별 지원 여부는 문서에 없습니다. 24H2 기반인 Windows 11 Enterprise LTSC 2024의 지원 여부도 확인하지 못했습니다.
+- OpenClaw Store Gateway가 쓰는 [IsolationSession](mxc-isolation-session.md)은 26100.9550·26200.9550·26300.9550·28000.3086 이상이 필요합니다. Microsoft 문서는 이 빌드를 만족해도 IsolationSession을 쓸 수 있다고 보장하지 않습니다.
+
+빌드 조건을 만족해도 실제 사용 가능 여부는 장치마다 다릅니다.
+
+- Microsoft 문서는 MXC가 지원하는 Windows 버전이어도 특정 정책 기능이 없을 수 있다고 설명합니다.
+- Codex 문서는 Microsoft가 필요한 기능을 Windows 11 장치에 배포하는 중이며, 버전 표만으로 특정 장치의 MXC 사용 가능 여부를 확정할 수 없다고 설명합니다.
+- Codex 소스는 OS 빌드 번호가 아니라 MXC의 실행 시점 프로브 결과로 사용 가능 여부를 판정합니다. SDK의 플랫폼 지원 조회와 프로브로 장치별 지원 여부를 확인할 수 있습니다.
+
+### Windows 사용자 중 비율
+
+StatCounter의 2026년 10월 데스크톱 통계입니다. 설치 대수가 아니라 웹 페이지 조회 기준입니다.
+
+| 지역 | Windows 중 Windows 11 | Windows 중 Windows 10 | 데스크톱 중 Windows | 데스크톱 전체 중 Windows 11(두 비율의 곱) |
+| --- | --- | --- | --- | --- |
+| 전 세계 | 74.29% | 25.13% | 76.65% | 약 56.9% |
+| 한국 | 66.03% | 33.73% | 86.1% | 약 56.9% |
+
+- **상한.** MXC는 Windows 11에서만 지원되므로 Windows 데스크톱 사용자 중 MXC를 쓸 수 있는 비율은 전 세계 최대 약 74%, 한국 최대 약 66%입니다.
+- **실제 비율은 이보다 낮습니다.** 다음 장치가 빠지기 때문입니다.
+  - 23H2 이하의 Windows 11. 23H2는 Home·Pro가 2025-11-11에, Enterprise·Education이 2026-11-10에 업데이트가 끝났습니다. Microsoft는 IT 부서가 관리하지 않는 Home·Pro 장치를 자동으로 새 기능 버전으로 올립니다.
+  - 2026년 9월 이후의 업데이트를 설치하지 않은 24H2·25H2 장치.
+  - 빌드 조건을 만족해도 기능이 아직 배포되지 않은 장치.
+- **얼마나 낮은지는 정할 수 없습니다.** Windows 11을 기능 버전이나 업데이트 수준별로 나눈 공개 통계를 찾지 못했습니다. StatCounter도 Windows 11을 나누지 않습니다.
+- 이 프로젝트의 측정 PC(Windows 11 Pro 25H2, 빌드 26200.9974)는 빌드 조건을 만족합니다. 실제로 MXC를 쓸 수 있는지는 확인하지 않았습니다.
+
+[MXC ProcessContainer OS 버전 지원](https://github.com/microsoft/mxc/blob/main/docs/backends/process-container/os-version-support.md) · [MXC 플랫폼 지원](https://learn.microsoft.com/en-us/windows/apps/develop/mxc/platform-support) · [Windows 365의 MXC 지원](https://learn.microsoft.com/en-us/windows-365/process-isolation-on-cloud-pcs) · [Codex Windows 샌드박스](https://learn.chatgpt.com/docs/windows/windows-sandbox) · [Codex 0.171.0 MXC 구현](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/mxc-sandbox/README.md) · [Windows 11 릴리스 정보](https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information) · [23H2 Home·Pro 지원 종료](https://www.bleepingcomputer.com/news/microsoft/microsoft-windows-11-23h2-reaches-end-of-support-in-30-days/amp/) · [StatCounter Windows 버전(전 세계)](https://gs.statcounter.com/windows-version-market-share/desktop/worldwide) · [StatCounter Windows 버전(한국)](https://gs.statcounter.com/windows-version-market-share/desktop/south-korea) · [StatCounter 데스크톱 OS(전 세계)](https://gs.statcounter.com/os-market-share/desktop/worldwide) · [StatCounter 데스크톱 OS(한국)](https://gs.statcounter.com/os-market-share/desktop/south-korea)
+
 ## 실측 시 확인
+
+이 프로젝트에서는 MXC를 실측하지 않기로 했습니다(2026-11-25). 아래는 실측할 때 확인할 항목입니다.
 
 OS 빌드와 MXC 기능 프로브, 최종 백엔드, 자식 실행과 종료 여부를 기록합니다. 정책이 적용된 합성 파일과 가짜 환경 변수, 허용·비허용 시험 서버의 결과를 경로별로 관찰합니다. 선택 실패와 정책에 의한 접근 차단을 각각 기록합니다.
 

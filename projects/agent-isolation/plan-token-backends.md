@@ -3,7 +3,7 @@
 QwenPaw와 Codex의 Restricted Token 방식이 어디까지 방어하고 한계가 무엇인지 정확히 확인하는 계획입니다. QwenPaw 비관리자, QwenPaw 관리자, Codex `unelevated`, Codex `elevated`를 같은 PC에서 같은 항목으로 측정합니다.
 - 설계 차이는 [Restricted Token 계열 백엔드 비교](research/restricted-token-backends.md)에 정리했습니다. 토큰, SID, DACL, ACE 같은 용어도 그 문서의 용어 절에 정의했습니다.
 - QwenPaw 비관리자 결과는 [QwenPaw 실측 보고서](report-qwenpaw-backends.md)에 있습니다.
-- MXC BaseContainer는 이 계획에 넣지 않았습니다. 프로젝트를 종료한 2026-11-25까지 측정하지 않았고, 후속 과제로 남겼습니다.
+- MXC BaseContainer는 이 계획에 넣지 않았습니다. 2026-11-25에 실측하지 않기로 했고, 사용할 수 있는 장치와 그 비율만 [MXC 조사](research/solutions/mxc.md#사용할-수-있는-장치와-비율)에 정리했습니다.
 - 이 계획은 2026-11-25에 Fable 검토를 두 번 거쳐 고쳤습니다. 사용자 결정이 필요한 항목은 7장에 모았습니다.
 
 **상태: 2026-11-25 측정 완료.** 아래 본문은 측정 전에 쓴 계획이고, 예상 칸의 내용은 측정 전 예상입니다. 단계별 최종 상태는 [5장](#5-진행-순서)에, 결과는 [결과 및 판단](findings.md#restricted-token-네-구성-실측-2026-11-25)에 있습니다.
