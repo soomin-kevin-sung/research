@@ -1,10 +1,11 @@
 # 결과 및 판단
 
-일곱 서비스의 [Windows 네이티브 실행 경로](README.md#windows-서비스별-조사)와 [Windows 격리 기술](research/README.md)을 문서와 소스로 조사했습니다. 실측은 세 묶음입니다.
+일곱 서비스의 [Windows 네이티브 실행 경로](README.md#windows-서비스별-조사)와 [Windows 격리 기술](research/README.md)을 문서와 소스로 조사했습니다. 실측은 네 묶음입니다.
 
 - **호스트 기준.** 같은 Windows 호스트에서 공통 워크로드를 5회 실행했습니다. [호스트 기준 실행](runs/2026-11-23-01.md)
 - **QwenPaw의 Restricted Token(비관리자)과 AppContainer.** ISO-01~14를 실측했습니다(ISO-13은 클립보드 열기만). ISO-15~18은 제품의 도구 래퍼와 승인 서비스를 직접 호출해 통합 실측했습니다. [QwenPaw 백엔드 실행](runs/2026-11-23-02.md) · [QwenPaw 실측 보고서](report-qwenpaw-backends.md)
 - **Restricted Token 네 구성.** QwenPaw `2.3.0.post1`의 비관리자·관리자와 Codex CLI `0.172.0`의 `unelevated`·`elevated`를 같은 항목으로 실측했습니다. [결과](#restricted-token-네-구성-실측-2026-11-25) · [사례별 보고서](report-token-backends/index.html)
+- **개별 계정 Restricted Token의 제한 SID 목록 줄이기.** 다른 세션의 요청으로, Codex `elevated` 구조의 시험 실행기에서 제한 SID 목록을 「승인용 SID + 샌드박스 계정」으로 줄였을 때를 실측했습니다. [결과](#개별-계정-restricted-token의-제한-sid-목록-줄이기-2026-11-26)
 
 MXC BaseContainer는 실측하지 않기로 했고, 사용할 수 있는 장치와 그 비율만 문서와 통계로 정리했습니다([MXC 사용 가능 장치](research/solutions/mxc.md#사용할-수-있는-장치와-비율)). 네 구성 비교에서는 네트워크 차단과 클립보드도 측정하지 않았습니다. 측정하지 않은 항목은 [측정하지 않은 항목과 후속 과제](#측정하지-않은-항목과-후속-과제)에 모았습니다.
 
@@ -228,6 +229,46 @@ QwenPaw `2.3.0.post1`의 비관리자(`WindowsUnelevatedSandbox`)와 Codex CLI `
 
 - **비관리자 두 구성.** Node가 파이프로 띄우는 자식 프로세스와 Git Bash가 모두 동작하지 않습니다. 명명된 파이프와 같은 원인(사용자 SID에만 쓰기를 준 객체, 제한 SID 목록에 사용자 SID 없음)으로 추정합니다. `npm run`, 테스트 실행기, 빌드 도구와 Git Bash를 셸로 쓰는 에이전트([Hermes Agent](research/agents/hermes.md)의 Windows 로컬 터미널 등)는 이 두 구성의 샌드박스에서 쓸 수 없는 것으로 봅니다. 실제 `npm`·테스트 실행기는 측정하지 않았습니다.
 - **QwenPaw 관리자.** 도구는 모두 동작했지만, 사용자 소유 저장소에서 `git`이 저장소 소유자 검사로 거부됩니다. Codex `elevated`는 작업 폴더의 Git 루트를 `GIT_CONFIG_*` 환경 변수로 `safe.directory`에 넣어 이 문제를 피합니다. [Codex 소스](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/windows-sandbox-rs/src/sandbox_utils.rs#L36-L54)
+
+## 개별 계정 Restricted Token의 제한 SID 목록 줄이기 (2026-11-26)
+
+다른 Claude 세션이 요청한 측정입니다.
+
+- **구성.** Codex 제품으로는 제한 SID 목록을 바꿀 수 없어서, Codex `elevated`와 같은 호출 구조의 시험 실행기를 만들었습니다(`CreateProcessWithLogonW` → 실행기 → `CreateRestrictedToken` → 셸).
+  - 측정용 계정 두 개를 만들었다 지웠고, 셸은 사용자 데스크톱(`WinSta0\Default`)에서 실행했습니다.
+  - 기준(Codex 목록: capability SID, 계정, 사용자 로그온 SID, Everyone)과 축소(capability SID, 계정)를 각 5회 쟀습니다.
+  - 축소 목록에서 깨진 대상에만 계정 ACE를 붙이는 구성 8개도 각 5회 쟀습니다.
+- [실행 기록](runs/2026-11-26-03.md)
+
+| 항목 | 기준 | 축소 | 축소 + 데스크톱·기본 DACL·장치(`NUL`·`CNG`·`KsecDD`) ACE |
+| --- | --- | --- | --- |
+| PowerShell 5.1 | 동작 | **시작 실패**(`0xC0000142`) | **실패**: `Starting the CLR failed with HRESULT 80070005`. `Local\`·전역 이름 공간 ACE를 더해도 같음 |
+| cmd, Python, Node 단순 실행 | 동작 | **시작 실패** | 동작 |
+| `NUL` 리디렉션(cmd, Python `DEVNULL`) | 동작 | 셸이 시작하지 못함 | 동작(장치 ACE 필요) |
+| 셸에서 띄운 창이 사용자 데스크톱에 보임 | 보임(메모장) | 셸이 시작하지 못함 | 보임(측정 프로그램의 시험 창) |
+| 명명된 파이프 생성(Python 병렬 빌드, `multiprocessing` Pipe, Node stdio `pipe` 자식, Node 파이프 서버) | 동작 | 셸이 시작하지 못함 | **실패**(생성 거부). 파이프 루트의 보안 설명자를 조회할 수 없어 ACE 시험은 하지 않음 |
+| Git Bash | 동작 | 셸이 시작하지 못함 | **실패**. MSYS2 디렉터리 단계는 ACE로 넘었지만 신호용 파이프 생성에서 실패 |
+| `Local\`·`Global\` 이름 있는 객체 만들기 | 동작 | 셸이 시작하지 못함 | 실패. 해당 이름 공간 디렉터리에 ACE를 붙이면 됨 |
+| `git status` + `safe.directory` 환경 변수 | 실패(사용자 `.gitconfig`를 읽지 못함) | 셸이 시작하지 못함 | 같음. `HOME`을 읽을 수 있는 폴더로 바꾸면 성공 |
+| Everyone·사용자 로그온 SID에 쓰기를 준 폴더·`HKCU` 키 | **씀** | — | 거부 |
+| 호스트 `Local\` 객체 열기·조작 | **열고 조작함** | — | 거부 |
+| 같은 이름 선점 | **됨** | — | 막힘. 단 `Local\` ACE를 붙이면 다시 됨 |
+| explorer를 `VM_READ`·`TERMINATE`, 토큰을 복제·가장 권한으로 열기(열기만) | **열림** | — | **열림** |
+| 자기 실행기를 모든 권한으로 열기 | **열림** | — | **열림** |
+
+- **축소 목록만으로는 셸이 뜨지 않습니다.** 원인은 사용자 로그온 SID나 Everyone에만 쓰기 계열 권한을 주는 시스템 객체입니다.
+  - 토큰 기본 DACL(Codex는 로그온 SID에만 모든 권한을 줌)
+  - 창 스테이션과 데스크톱
+  - `\Device\Null`·`\Device\CNG`·`\Device\KsecDD`
+  - 이 대상에 계정 ACE를 붙여야 cmd·Python·Node가 시작합니다. 그래도 PowerShell 5.1, 명명된 파이프를 쓰는 도구(병렬 빌드, `npm`류 자식 프로세스, Git Bash)는 동작하지 않았습니다.
+- **닫히는 것은 두 번째 검사로 막히는 구멍입니다.** Everyone·로그온 SID 쓰기 위치와 호스트 `Local\` 객체가 여기에 해당합니다.
+  - 첫 번째 검사만 받는 사용자 프로세스 읽기·종료·토큰 열기는 그대로입니다. `CreateProcessWithLogonW`가 그룹 목록에 사용자 로그온 SID를 넣기 때문입니다.
+  - 자기 실행기 노출도 그대로입니다. 계정 SID가 제한 SID 목록에 남기 때문입니다.
+- **쓰기 ACE는 capability SID만으로는 부족합니다.** capability SID ACE만 있는 폴더는 첫 번째 검사에서, 그룹 ACE만 있는 폴더는 두 번째 검사에서 거부됐습니다.
+  - 쓰려면 둘을 함께 붙이거나 계정 ACE를 붙여야 합니다.
+  - 같은 이유로, 두 번째 검사에서 막힌 시스템 객체는 그룹 ACE로는 풀리지 않아 계정 SID로 붙여야 합니다.
+- **보충 ACE의 비용.** 장치·전역 이름 공간 ACE는 컴퓨터 전체 객체의 DACL 변경입니다. 이번 측정에서는 메모리에서만 바꿨는데, 재부팅하면 사라지므로 설치 단계(관리자)가 계정마다 다시 붙여야 합니다.
+- **오류 창.** 시작에 실패한 셸마다 사용자 화면에 "응용 프로그램을 제대로 시작하지 못했습니다" 창이 떴습니다. 실행기에서 Codex처럼 `SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX)`를 설정해야 뜨지 않습니다.
 
 ## 측정하지 않은 항목과 후속 과제
 

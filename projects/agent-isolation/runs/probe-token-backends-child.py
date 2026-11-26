@@ -13,6 +13,9 @@ Named objects and pipes (2026-11-26) use only synthetic iso-nq-* names; the only
 test string into synthetic sections and pipes. No pipe client is impersonated.
 "run" tasks (2026-11-26, T1-T6) start installed tools (Node, Git Bash, Git) with the test commands the
 harness passes; they touch only the workspace and its test repository.
+2026-11-26-03 (reduced restricting SID list): user32, crypt32 and userenv are loaded only if they can be
+(a token without desktop access may fail user32 initialization); "run" tasks may give the tool an empty
+pipe instead of NUL as standard input ("stdin": "pipe") and extra environment variables ("env").
 """
 import os
 import sys
@@ -27,9 +30,21 @@ from pathlib import Path
 k32 = ctypes.WinDLL("kernel32", use_last_error=True)
 adv = ctypes.WinDLL("advapi32", use_last_error=True)
 ntdll = ctypes.WinDLL("ntdll")
-user32 = ctypes.WinDLL("user32", use_last_error=True)
-crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
-userenv = ctypes.WinDLL("userenv", use_last_error=True)
+DLL_ERRORS = {}
+
+
+def _dll(name):
+    """None if the DLL cannot be loaded (for example user32 initialization without desktop access)."""
+    try:
+        return ctypes.WinDLL(name, use_last_error=True)
+    except OSError as e:
+        DLL_ERRORS[name] = f"error:{getattr(e, 'winerror', None)}"
+        return None
+
+
+user32 = _dll("user32")
+crypt32 = _dll("crypt32")
+userenv = _dll("userenv")
 
 HANDLE = wintypes.HANDLE
 k32.OpenProcess.restype = HANDLE
@@ -51,11 +66,13 @@ adv.ConvertSidToStringSidW.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.
 adv.GetAce.argtypes = [ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p)]
 adv.LookupPrivilegeNameW.argtypes = [wintypes.LPCWSTR, ctypes.c_void_p, wintypes.LPWSTR,
                                      ctypes.POINTER(wintypes.DWORD)]
-user32.GetThreadDesktop.restype = HANDLE
-user32.GetProcessWindowStation.restype = HANDLE
-user32.GetUserObjectInformationW.argtypes = [HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
-                                             ctypes.POINTER(wintypes.DWORD)]
-userenv.GetUserProfileDirectoryW.argtypes = [HANDLE, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+if user32:
+    user32.GetThreadDesktop.restype = HANDLE
+    user32.GetProcessWindowStation.restype = HANDLE
+    user32.GetUserObjectInformationW.argtypes = [HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+                                                 ctypes.POINTER(wintypes.DWORD)]
+if userenv:
+    userenv.GetUserProfileDirectoryW.argtypes = [HANDLE, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
 ntdll.NtQueryInformationProcess.argtypes = [HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.ULONG,
                                             ctypes.POINTER(wintypes.ULONG)]
 ntdll.NtQueryKey.argtypes = [HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.ULONG,
@@ -143,6 +160,8 @@ def hkcu_name():
 
 
 def profile_dir():
+    if not userenv:
+        return "userenv_unavailable"
     h = own_token()
     size = wintypes.DWORD(1024)
     buf = ctypes.create_unicode_buffer(1024)
@@ -203,8 +222,9 @@ def token_info():
            "integrity": sid_str(ctypes.c_void_p.from_buffer(il, 0).value) if il else None,
            "privileges": privs,
            "default_dacl": acl_aces(ctypes.c_void_p.from_buffer(dd, 0).value) if dd else None,
-           "desktop": obj_name(user32.GetThreadDesktop(k32.GetCurrentThreadId())),
-           "winsta": obj_name(user32.GetProcessWindowStation()),
+           "desktop": obj_name(user32.GetThreadDesktop(k32.GetCurrentThreadId())) if user32 else "user32_unavailable",
+           "winsta": obj_name(user32.GetProcessWindowStation()) if user32 else "user32_unavailable",
+           "dll_errors": DLL_ERRORS,
            "hkcu": hkcu_name(), "profile_dir": profile_dir(), "pid": os.getpid(), "ppid_chain": ancestors()}
     res.update(job_info())
     k32.CloseHandle(h)
@@ -391,6 +411,8 @@ class BLOB(ctypes.Structure):
 
 
 def dpapi_unprotect(path, expected):
+    if not crypt32:
+        return "crypt32_unavailable"
     try:
         data = Path(path).read_bytes()
     except OSError as e:
@@ -433,6 +455,8 @@ def sleeper(seconds, hb):
 
 
 def window(seconds, title):
+    if not user32:
+        return "user32_unavailable"
     user32.CreateWindowExW.restype = HANDLE
     user32.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD,
                                        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
@@ -786,14 +810,18 @@ def pipe_client(name, data):
     return out
 
 
-def run_tool(argv, cwd=None, timeout=30):
+def run_tool(argv, cwd=None, timeout=30, stdin="devnull", env=None):
     """T1-T6: run an installed tool (Node, Git Bash, Git) and keep its exit code and output tails.
-    Output is captured through anonymous pipes, which worked in all four configurations (ISO-11)."""
+    Output is captured through anonymous pipes, which worked in all four configurations (ISO-11).
+    stdin "devnull" opens NUL (subprocess.DEVNULL, used up to 2026-11-26-02); "pipe" gives an empty pipe."""
     t0 = time.monotonic()
+    kw = {"stdin": subprocess.DEVNULL} if stdin == "devnull" else {"input": b""}
+    if env:
+        kw["env"] = {**os.environ, **env}
     try:
         # argv is passed unchanged: expandvars would replace $PATH in bash commands before bash sees them
         p = subprocess.run(list(argv), cwd=expand(cwd) if cwd else None, capture_output=True,
-                           stdin=subprocess.DEVNULL, timeout=timeout)
+                           timeout=timeout, **kw)
         return {"exit": p.returncode, "seconds": round(time.monotonic() - t0, 2),
                 "stdout": p.stdout.decode("utf-8", "replace")[-800:],
                 "stderr": p.stderr.decode("utf-8", "replace")[-800:]}
@@ -876,7 +904,7 @@ def run_task(t):
     if kind == "hold":
         return hold(t["seconds"], expand(t["heartbeat"]), expand(t["stop"]))
     if kind == "run":
-        return run_tool(t["argv"], t.get("cwd"), t.get("timeout", 30))
+        return run_tool(t["argv"], t.get("cwd"), t.get("timeout", 30), t.get("stdin", "devnull"), t.get("env"))
     return f"unknown_kind:{kind}"
 
 

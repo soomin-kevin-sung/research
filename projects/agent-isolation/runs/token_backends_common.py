@@ -11,7 +11,7 @@ import win32api
 import win32con
 import win32security
 
-ROOT = Path(r"C:\agent-isolation-test")
+ROOT = Path(os.environ.get("ISO_ROOT", r"C:\agent-isolation-test"))  # ISO_ROOT: 2026-11-26-04 uses a folder under the profile
 TOOLS = ROOT / "tools"
 PYRT = TOOLS / "pyrt"
 PY = PYRT / "python.exe"
