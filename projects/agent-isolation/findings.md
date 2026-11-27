@@ -1,12 +1,13 @@
 # 결과 및 판단
 
-일곱 서비스의 [Windows 네이티브 실행 경로](README.md#windows-서비스별-조사)와 [Windows 격리 기술](research/README.md)을 문서와 소스로 조사했습니다. 실측은 다섯 묶음입니다.
+일곱 서비스의 [Windows 네이티브 실행 경로](README.md#windows-서비스별-조사)와 [Windows 격리 기술](research/README.md)을 문서와 소스로 조사했습니다. 실측은 여섯 묶음입니다.
 
 - **호스트 기준.** 같은 Windows 호스트에서 공통 워크로드를 5회 실행했습니다. [호스트 기준 실행](runs/2026-11-23-01.md)
 - **QwenPaw의 Restricted Token(비관리자)과 AppContainer.** ISO-01~14를 실측했습니다(ISO-13은 클립보드 열기만). ISO-15~18은 제품의 도구 래퍼와 승인 서비스를 직접 호출해 통합 실측했습니다. [QwenPaw 백엔드 실행](runs/2026-11-23-02.md) · [QwenPaw 실측 보고서](report-qwenpaw-backends.md)
 - **Restricted Token 네 구성.** QwenPaw `2.3.0.post1`의 비관리자·관리자와 Codex CLI `0.172.0`의 `unelevated`·`elevated`를 같은 항목으로 실측했습니다. [결과](#restricted-token-네-구성-실측-2026-11-25) · [사례별 보고서](report-token-backends/index.html)
 - **개별 계정 Restricted Token의 제한 SID 목록 줄이기.** 다른 세션의 요청으로, Codex `elevated` 구조의 시험 실행기에서 제한 SID 목록을 「승인용 SID + 샌드박스 계정」으로 줄였을 때를 실측했습니다. [결과](#개별-계정-restricted-token의-제한-sid-목록-줄이기-2026-11-26)
 - **Codex `elevated` 구조의 실제 사용 조건.** 같은 요청 세션의 후속 요청으로 Everyone·로그온 SID에 쓰기를 준 레지스트리 키, 설치 위치별 도구, Git Bash 실행 순서, offline·online 계정 네트워크, PowerShell 시작 위치를 실측했습니다. [결과](#codex-elevated-구조의-실제-사용-조건-2026-11-26)
+- **Codex `elevated` 구조의 schannel HTTPS 실패 원인.** 같은 요청 세션의 요청으로 프로필 로드와 제한 토큰을 따로 떼어 실측했습니다. [결과](#codex-elevated-구조의-schannel-https-실패-원인-2026-11-26)
 
 MXC BaseContainer는 실측하지 않기로 했고, 사용할 수 있는 장치와 그 비율만 문서와 통계로 정리했습니다([MXC 사용 가능 장치](research/solutions/mxc.md#사용할-수-있는-장치와-비율)). 네 구성 비교에서는 네트워크 차단과 클립보드도 측정하지 않았습니다. 측정하지 않은 항목은 [측정하지 않은 항목과 후속 과제](#측정하지-않은-항목과-후속-과제)에 모았습니다.
 
@@ -290,12 +291,30 @@ QwenPaw `2.3.0.post1`의 비관리자(`WindowsUnelevatedSandbox`)와 Codex CLI `
 | `WindowsApps` 앱 실행 별칭 | 샌드박스에서 시작 거부(5) 5/5. 실제 설치 경로를 써야 함 |
 | Git Bash 실행 순서(사용자 먼저, 샌드박스 먼저, 샌드박스 둘, 샌드박스만) | 모두 동작 5/5. 샌드박스가 먼저 띄워도 사용자 Git Bash 정상. MSYS2 디렉터리는 먼저 시작한 계정이 소유하고 DACL은 Everyone 권한. 공용 section `shared.5`는 NULL DACL이라 사용자와 샌드박스가 서로 씀 |
 | offline 계정 네트워크 | TCP·HTTP·HTTPS·`nslookup` 모두 막힘 0/5. DNS 클라이언트 서비스를 거치는 이름 조회는 됨 5/5 |
-| online 계정 네트워크 | TCP·HTTP·Python HTTPS 됨 5/5. schannel HTTPS(curl, `Invoke-WebRequest`)는 실패 0/5(`SEC_E_NO_CREDENTIALS` 등). 프로필 없는 로그온 때문으로 추정 |
+| online 계정 네트워크 | TCP·HTTP·Python HTTPS 됨 5/5. schannel HTTPS(curl, `Invoke-WebRequest`)는 실패 0/5(`SEC_E_NO_CREDENTIALS` 등). 원인은 셸 토큰이 제한 토큰이라는 점([2026-11-26-05](runs/2026-11-26-05.md)). 처음에는 프로필 없는 로그온 때문으로 추정했으나 틀림 |
 | PowerShell 5.1 시작 위치·상대 경로 | 작업 폴더까지의 상위 하나라도 목록을 볼 수 없으면 시작 위치가 C:\로 바뀌고 상대 경로·`Set-Location` 실패 0/5. cmd·Python은 정상. 막힌 상위는 사용자 소유 시험 폴더였고 사용자 권한의 목록 ACE로 풀림. `C:\`·`C:\Users`(관리자 소유)는 Users로 원래 보여 **ACE가 필요 없었음** |
 
 - **Codex offline 차단 방식(소스).** 방화벽 규칙이 offline 계정의 루프백이 아닌 모든 통신을 막고(루프백은 프록시 포트만 허용), WFP 필터가 ICMP·DNS·SMB를 막습니다.
   - 계정 단위 규칙이라 서비스가 대신 보내는 DNS 질의는 막지 않았습니다.
   - 이 경로로 데이터를 보낼 수 있는지는 재지 않았습니다.
+
+## Codex `elevated` 구조의 schannel HTTPS 실패 원인 (2026-11-26)
+
+같은 요청 세션이 2026-11-26-04의 online 계정 schannel HTTPS 실패를 프로필 로드와 제한 토큰으로 나눠 재 달라고 요청한 측정입니다.
+
+- 구성: 측정 계정 하나를 만들었다 지웠습니다. 같은 시험 실행기로 로그온 플래그(0, `LOGON_WITH_PROFILE`)와 셸 토큰(제한 없음, Codex 제한 토큰)을 조합해 각 5회 쟀습니다.
+- UAC 없는 대조로 현재 사용자 토큰을 바꾼 7가지 토큰도 쟀습니다.
+- [실행 기록](runs/2026-11-26-05.md)
+
+| 질문 | 결과 |
+| --- | --- |
+| 프로필 로드가 schannel 실패를 푸는가 | **풀지 못함.** 플래그 0·제한 없음 5/5, 프로필·제한 없음 5/5, 플래그 0·Codex 제한 토큰 0/5, 프로필·Codex 제한 토큰 0/5. 프로필이 생긴 뒤 플래그 0으로 다시 띄워도 같음 |
+| 원인 | 셸 토큰이 제한 토큰이라는 점. `AcquireCredentialsHandleW`가 schannel·Negotiate 모두 `SEC_E_NO_CREDENTIALS`. 현재 사용자 토큰에 Everyone 하나만 넣어도, 토큰의 모든 그룹 SID를 넣어 DACL 판정이 원래 토큰과 같아져도, `WRITE_RESTRICTED` 유무와 관계없이 실패. `DISABLE_MAX_PRIVILEGE`·`LUA_TOKEN`만으로는 성공 |
+| 영향받는 도구 | `curl.exe`, PowerShell 5.1 `Invoke-WebRequest`, `git -c http.sslBackend=schannel` 모두 0/5. Python urllib(OpenSSL)은 모든 칸에서 5/5 |
+| 프로필 로드의 부수 효과 | 첫 로그온에서 프로필 폴더와 `ProfileList` 항목이 생김. 셸(`WRITE_RESTRICTED`)이 자기 HKCU에 쓰고 다음 실행에서 다시 읽음(4/4). 하이브는 실행기가 끝나면 바로 내려감. 프로필과 계정을 지운 뒤 계정 SID 이름의 HKLM 키 2개(`ProfileService\References`, `StateRepository` 색인)가 남음 |
+
+- 2026-11-26-04의 추정(프로필 없는 로그온)은 틀렸습니다. 해당 실행 기록과 위 표에 정정을 적었습니다.
+- LSA·schannel 내부의 판정은 확인하지 못했습니다. 실제 Codex online 계정으로 다시 재지는 않았습니다.
 
 ## 측정하지 않은 항목과 후속 과제
 

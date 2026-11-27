@@ -17,6 +17,8 @@ Token, following Codex rust-v0.171.0 windows-sandbox-rs/src/token.rs (create_tok
                      Turn SIDs come from the launch ("extra_sids") or the spec; one token per distinct list.
                      full1, full2 and turn SIDs were added for a follow-up request that was cancelled before
                      it ran; no measurement used them.
+                     none:    no restricting SID, no flag (2026-11-26-05 cells A and C): a CreateRestrictedToken
+                              copy of the launcher token, its own default DACL and privileges kept
   default DACL       logon SID GENERIC_ALL, OWNER RIGHTS READ_CONTROL (Codex set_default_dacl)
                      "account" variant adds the own account SID GENERIC_ALL
   SeChangeNotifyPrivilege enabled
@@ -27,6 +29,8 @@ Differences from Codex: no private desktop (WinSta0\\Default), standard handles 
 pipe opened here instead of the runner's named pipes, no PID check, one restricted process per launch.
 
 Usage: python launcher.py <spec.json>
+spec["env_inherit"] (2026-11-26-05): the launches get the launcher's own environment with spec["env"] on top,
+instead of spec["env"] alone.
 Only the launcher's own token is opened. The result JSON is written to spec["result"].
 """
 import os
@@ -144,6 +148,11 @@ def own_token():
 def restricted_token(base, mode, cap_sid, dacl_variant, extra=()):
     """Returns (token handle, record, launcher token info)."""
     info = C.token_info()
+    if mode == "none":
+        new = HANDLE()
+        if not adv.CreateRestrictedToken(base, 0, 0, None, 0, None, 0, None, ctypes.byref(new)):
+            raise OSError(f"CreateRestrictedToken: {err()}")
+        return new, {"restricting_sids": C.tok_groups(new, 11), "flags": "none"}, info
     user, logon = info["user"], (info["logon_sids"] or [None])[0]
     if not logon:
         raise OSError("no logon SID in the launcher token")
@@ -247,7 +256,7 @@ def main():
             return tokens[key]
         token_for(spec.get("extra_sids", []))
         out["launcher_process_sd"] = C.kobj_sddl(k32.GetCurrentProcess())
-        env = env_block(spec["env"])
+        env = env_block({**os.environ, **spec["env"]} if spec.get("env_inherit") else spec["env"])
         for L in spec["launches"]:
             try:
                 out["launches"][L["id"]] = launch(token_for(L.get("extra_sids", spec.get("extra_sids", []))), L, env,
