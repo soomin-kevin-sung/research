@@ -31,6 +31,7 @@ pipe opened here instead of the runner's named pipes, no PID check, one restrict
 Usage: python launcher.py <spec.json>
 spec["env_inherit"] (2026-11-26-05): the launches get the launcher's own environment with spec["env"] on top,
 instead of spec["env"] alone.
+launch["job_ui"] (2026-11-27-01): JOB_OBJECT_UILIMIT_* flags set on the launch's Job before the process resumes.
 Only the launcher's own token is opened. The result JSON is written to spec["result"].
 """
 import os
@@ -218,6 +219,10 @@ def launch(tok, L, env, cwd):
     lim = C.EXT_LIMIT()
     lim.Basic.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
     k32.SetInformationJobObject(job, 9, ctypes.byref(lim), ctypes.sizeof(lim))
+    ui_set = None
+    if L.get("job_ui"):  # 2026-11-27-01: JobObjectBasicUIRestrictions, e.g. READCLIPBOARD 0x2 | WRITECLIPBOARD 0x4
+        ui = DW(L["job_ui"])
+        ui_set = "ok" if k32.SetInformationJobObject(job, 4, ctypes.byref(ui), ctypes.sizeof(ui)) else err()
     in_job = bool(k32.AssignProcessToJobObject(job, pi.hProcess))
     k32.ResumeThread(pi.hThread)
     w = k32.WaitForSingleObject(pi.hProcess, int(L.get("timeout", 60) * 1000))
@@ -229,6 +234,8 @@ def launch(tok, L, env, cwd):
          "console": L.get("console", "hidden"),
          "exit": "timeout" if w == 0x102 else f"0x{code.value:08x}", "job_total_processes": acct.TotalProcesses,
          "job_active_after_main_exit": acct.ActiveProcesses}
+    if ui_set is not None:
+        r["job_ui"] = {"flags": hex(L["job_ui"]), "set": ui_set}
     if w == 0x102 or acct.ActiveProcesses:
         k32.TerminateJobObject(job, 1)
     for h in (pi.hThread, pi.hProcess, job):
